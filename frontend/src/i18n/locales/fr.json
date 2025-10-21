@@ -1,0 +1,118 @@
+{
+    "common": {
+        "loading": "Chargement...",
+        "error": "Erreur",
+        "success": "Succès",
+        "cancel": "Annuler",
+        "continue": "Continuer",
+        "save": "Enregistrer",
+        "delete": "Supprimer",
+        "edit": "Modifier",
+        "back": "Retour",
+        "next": "Suivant",
+        "previous": "Précédent",
+        "finish": "Terminer",
+        "close": "Fermer",
+        "yes": "Oui",
+        "no": "Non"
+    },
+    "navigation": {
+        "home": "Accueil",
+        "dashboard": "Tableau de bord",
+        "interviews": "Entretiens",
+        "candidates": "Candidats",
+        "settings": "Paramètres",
+        "profile": "Profil",
+        "logout": "Déconnexion"
+    },
+    "auth": {
+        "login": "Connexion",
+        "register": "S'inscrire",
+        "email": "Email",
+        "password": "Mot de passe",
+        "confirmPassword": "Confirmer le mot de passe",
+        "forgotPassword": "Mot de passe oublié ?",
+        "loginSuccess": "Connexion réussie",
+        "loginError": "Échec de la connexion",
+        "registerSuccess": "Inscription réussie",
+        "registerError": "Échec de l'inscription"
+    },
+    "consent": {
+        "title": "Consentement au traitement des données",
+        "subtitle": "Avant de commencer votre entretien, veuillez examiner et consentir à nos pratiques de traitement des données.",
+        "videoRecording": {
+            "title": "Enregistrement vidéo",
+            "description": "Nous enregistrerons votre vidéo pendant l'entretien à des fins d'analyse. Cela inclut les expressions faciales et le langage corporel."
+        },
+        "audioRecording": {
+            "title": "Enregistrement audio",
+            "description": "Nous enregistrerons votre voix pendant l'entretien pour l'analyse vocale et la transcription."
+        },
+        "aiAnalysis": {
+            "title": "Analyse IA",
+            "description": "Vos réponses seront analysées à l'aide de l'intelligence artificielle pour évaluer les compétences en communication, la confiance et d'autres métriques pertinentes."
+        },
+        "dataRetention": {
+            "title": "Rétention des données",
+            "description": "Les enregistrements vidéo/audio seront stockés pendant 30 jours, les transcriptions pendant 90 jours, et les résultats d'analyse pendant 1 an."
+        },
+        "dataUsage": {
+            "title": "Utilisation des données",
+            "description": "Vos données seront utilisées uniquement pour l'évaluation de l'entretien et ne seront pas partagées avec des tiers sans votre consentement explicite."
+        },
+        "withdrawConsent": {
+            "title": "Retirer le consentement",
+            "description": "Vous pouvez retirer votre consentement à tout moment en nous contactant. Cela arrêtera le traitement ultérieur de vos données."
+        },
+        "required": "Tous les consentements sont requis pour procéder à l'entretien.",
+        "agree": "J'accepte et continue",
+        "decline": "Je refuse",
+        "declineMessage": "Malheureusement, nous ne pouvons pas procéder à l'entretien sans votre consentement au traitement des données."
+    },
+    "interview": {
+        "title": "Entretien IA",
+        "preparation": "Préparation de l'entretien",
+        "start": "Commencer l'entretien",
+        "inProgress": "Entretien en cours",
+        "completed": "Entretien terminé",
+        "recording": "Enregistrement...",
+        "timeElapsed": "Temps écoulé",
+        "question": "Question",
+        "answer": "Votre réponse",
+        "nextQuestion": "Question suivante",
+        "finishInterview": "Terminer l'entretien",
+        "confirmFinish": "Êtes-vous sûr de vouloir terminer l'entretien ?",
+        "cannotPause": "Cet entretien ne peut pas être mis en pause une fois commencé."
+    },
+    "dashboard": {
+        "welcome": "Bienvenue sur votre tableau de bord",
+        "recentInterviews": "Entretiens récents",
+        "upcomingInterviews": "Entretiens à venir",
+        "analytics": "Analyses",
+        "noInterviews": "Aucun entretien trouvé"
+    },
+    "results": {
+        "title": "Résultats de l'entretien",
+        "overallScore": "Score global",
+        "communication": "Communication",
+        "confidence": "Confiance",
+        "clarity": "Clarté",
+        "positivity": "Positivité",
+        "transcript": "Transcription de l'entretien",
+        "emotions": "Analyse des émotions",
+        "voiceAnalysis": "Analyse vocale",
+        "downloadReport": "Télécharger le rapport",
+        "shareResults": "Partager les résultats"
+    },
+    "errors": {
+        "generic": "Une erreur s'est produite. Veuillez réessayer.",
+        "network": "Erreur réseau. Veuillez vérifier votre connexion.",
+        "permission": "Permission refusée. Veuillez vérifier les paramètres de votre caméra et microphone.",
+        "consentRequired": "Le consentement est requis pour continuer.",
+        "interviewNotFound": "Entretien non trouvé.",
+        "unauthorized": "Vous n'êtes pas autorisé à accéder à cette ressource."
+    }
+}
+
+
+

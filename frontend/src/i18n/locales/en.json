@@ -1,0 +1,118 @@
+{
+    "common": {
+        "loading": "Loading...",
+        "error": "Error",
+        "success": "Success",
+        "cancel": "Cancel",
+        "continue": "Continue",
+        "save": "Save",
+        "delete": "Delete",
+        "edit": "Edit",
+        "back": "Back",
+        "next": "Next",
+        "previous": "Previous",
+        "finish": "Finish",
+        "close": "Close",
+        "yes": "Yes",
+        "no": "No"
+    },
+    "navigation": {
+        "home": "Home",
+        "dashboard": "Dashboard",
+        "interviews": "Interviews",
+        "candidates": "Candidates",
+        "settings": "Settings",
+        "profile": "Profile",
+        "logout": "Logout"
+    },
+    "auth": {
+        "login": "Login",
+        "register": "Register",
+        "email": "Email",
+        "password": "Password",
+        "confirmPassword": "Confirm Password",
+        "forgotPassword": "Forgot Password?",
+        "loginSuccess": "Login successful",
+        "loginError": "Login failed",
+        "registerSuccess": "Registration successful",
+        "registerError": "Registration failed"
+    },
+    "consent": {
+        "title": "Data Processing Consent",
+        "subtitle": "Before starting your interview, please review and consent to our data processing practices.",
+        "videoRecording": {
+            "title": "Video Recording",
+            "description": "We will record your video during the interview for analysis purposes. This includes facial expressions and body language."
+        },
+        "audioRecording": {
+            "title": "Audio Recording",
+            "description": "We will record your voice during the interview for speech analysis and transcription."
+        },
+        "aiAnalysis": {
+            "title": "AI Analysis",
+            "description": "Your responses will be analyzed using artificial intelligence to assess communication skills, confidence, and other relevant metrics."
+        },
+        "dataRetention": {
+            "title": "Data Retention",
+            "description": "Video/audio recordings will be stored for 30 days, transcripts for 90 days, and analysis results for 1 year."
+        },
+        "dataUsage": {
+            "title": "Data Usage",
+            "description": "Your data will be used solely for interview evaluation and will not be shared with third parties without your explicit consent."
+        },
+        "withdrawConsent": {
+            "title": "Withdraw Consent",
+            "description": "You can withdraw your consent at any time by contacting us. This will stop further processing of your data."
+        },
+        "required": "All consents are required to proceed with the interview.",
+        "agree": "I Agree and Continue",
+        "decline": "I Decline",
+        "declineMessage": "Unfortunately, we cannot proceed with the interview without your consent to data processing."
+    },
+    "interview": {
+        "title": "AI Interview",
+        "preparation": "Interview Preparation",
+        "start": "Start Interview",
+        "inProgress": "Interview in Progress",
+        "completed": "Interview Completed",
+        "recording": "Recording...",
+        "timeElapsed": "Time Elapsed",
+        "question": "Question",
+        "answer": "Your Answer",
+        "nextQuestion": "Next Question",
+        "finishInterview": "Finish Interview",
+        "confirmFinish": "Are you sure you want to finish the interview?",
+        "cannotPause": "This interview cannot be paused once started."
+    },
+    "dashboard": {
+        "welcome": "Welcome to your dashboard",
+        "recentInterviews": "Recent Interviews",
+        "upcomingInterviews": "Upcoming Interviews",
+        "analytics": "Analytics",
+        "noInterviews": "No interviews found"
+    },
+    "results": {
+        "title": "Interview Results",
+        "overallScore": "Overall Score",
+        "communication": "Communication",
+        "confidence": "Confidence",
+        "clarity": "Clarity",
+        "positivity": "Positivity",
+        "transcript": "Interview Transcript",
+        "emotions": "Emotion Analysis",
+        "voiceAnalysis": "Voice Analysis",
+        "downloadReport": "Download Report",
+        "shareResults": "Share Results"
+    },
+    "errors": {
+        "generic": "An error occurred. Please try again.",
+        "network": "Network error. Please check your connection.",
+        "permission": "Permission denied. Please check your camera and microphone settings.",
+        "consentRequired": "Consent is required to proceed.",
+        "interviewNotFound": "Interview not found.",
+        "unauthorized": "You are not authorized to access this resource."
+    }
+}
+
+
+
