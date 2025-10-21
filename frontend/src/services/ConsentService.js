@@ -1,7 +1,7 @@
 // Consent Service - Handles GDPR consent management
 class ConsentService {
     constructor() {
-        this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+        this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
     }
 
     // Generate a unique user ID for consent tracking

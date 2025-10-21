@@ -18,7 +18,7 @@ const logger = {
     info: (message) => console.log(message)
 };
 const app = (0, express_1.default)();
-const PORT = parseInt(process.env.PORT || '5000', 10);
+const PORT = parseInt(process.env.PORT || '3001', 10);
 app.use((0, cors_1.default)({
     origin: process.env.FRONTEND_URL || 'http://localhost:3005'
 }));

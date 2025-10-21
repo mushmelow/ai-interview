@@ -2,7 +2,7 @@ import axios from 'axios';
 
 class InterviewService {
     constructor() {
-        this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+        this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
     }
 
     // Start a new interview session
