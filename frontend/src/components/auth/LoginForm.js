@@ -7,7 +7,6 @@ import {
     Typography,
     Alert,
     CircularProgress,
-    Link,
     Divider
 } from '@mui/material';
 import { Login as LoginIcon, PersonAdd as RegisterIcon } from '@mui/icons-material';

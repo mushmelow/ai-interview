@@ -1,15 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     ThemeProvider,
-    createTheme,
     CssBaseline,
     Container,
     Typography,
     Box,
     Paper,
     Button,
-    AppBar,
-    Toolbar,
     Chip,
     Snackbar,
     Alert,
@@ -25,18 +22,21 @@ import {
 
 // Import components
 import { Header, ConsentFlow, ConsentStatus, AuthPage } from './components';
-import InterviewRecording from './components/InterviewRecording';
+import Interview from './components/Interview';
 import { theme } from './styles/theme';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ConsentData } from './types';
+
+type ViewType = 'dashboard' | 'interview';
 
 // Main App Content Component
-function AppContent() {
+const AppContent: React.FC = () => {
     const { user, loading } = useAuth();
-    const [showConsent, setShowConsent] = React.useState(false);
-    const [consentGiven, setConsentGiven] = React.useState(false);
-    const [snackbarOpen, setSnackbarOpen] = React.useState(false);
-    const [currentView, setCurrentView] = React.useState('dashboard'); // 'dashboard' or 'interview'
-    const [consentRefreshKey, setConsentRefreshKey] = React.useState(0);
+    const [showConsent, setShowConsent] = useState<boolean>(false);
+    const [consentGiven, setConsentGiven] = useState<boolean>(false);
+    const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
+    const [currentView, setCurrentView] = useState<ViewType>('dashboard');
+    const [consentRefreshKey, setConsentRefreshKey] = useState<number>(0);
 
     // Show loading spinner while checking authentication
     if (loading) {
@@ -59,7 +59,7 @@ function AppContent() {
         return <AuthPage />;
     }
 
-    const handleStartInterview = () => {
+    const handleStartInterview = (): void => {
         if (!consentGiven) {
             setShowConsent(true);
         } else {
@@ -67,15 +67,15 @@ function AppContent() {
         }
     };
 
-    const handleBackToDashboard = () => {
+    const handleBackToDashboard = (): void => {
         setCurrentView('dashboard');
     };
 
-    const handleConsentFlow = () => {
+    const handleConsentFlow = (): void => {
         setShowConsent(true);
     };
 
-    const handleConsent = (consentData) => {
+    const handleConsent = (consentData: ConsentData): void => {
         console.log('Consents given:', consentData);
         setConsentGiven(true);
         setShowConsent(false);
@@ -91,12 +91,12 @@ function AppContent() {
         setConsentRefreshKey(prev => prev + 1);
     };
 
-    const handleDecline = () => {
+    const handleDecline = (): void => {
         setShowConsent(false);
         console.log('Consent declined');
     };
 
-    const handleCloseSnackbar = () => {
+    const handleCloseSnackbar = (): void => {
         setSnackbarOpen(false);
     };
 
@@ -105,7 +105,7 @@ function AppContent() {
         return (
             <Box className="App">
                 <Header showBackButton={true} onBackClick={handleBackToDashboard} />
-                <InterviewRecording />
+                <Interview />
             </Box>
         );
     }
@@ -114,7 +114,7 @@ function AppContent() {
     return (
         <Box className="App">
             {/* Header */}
-            <Header />
+            <Header showBackButton={false} onBackClick={() => { }} />
 
             {/* Main Content */}
             <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -148,7 +148,7 @@ function AppContent() {
                             <Psychology color="primary" sx={{ fontSize: 40, mb: 1 }} />
                             <Typography variant="h6">Backend</Typography>
                             <Typography variant="body2" color="success.main">
-                                ✅ Running on port 5000
+                                ✅ Running on port 4000
                             </Typography>
                         </Paper>
                     </Box>
@@ -216,10 +216,10 @@ function AppContent() {
             </Snackbar>
         </Box>
     );
-}
+};
 
 // Main App Component with AuthProvider
-function App() {
+const App: React.FC = () => {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
@@ -228,6 +228,6 @@ function App() {
             </AuthProvider>
         </ThemeProvider>
     );
-}
+};
 
 export default App;

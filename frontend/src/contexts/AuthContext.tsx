@@ -1,13 +1,25 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import axios, { AxiosResponse } from 'axios';
+import { User, LoginData, RegisterData, AuthResponse } from '../types';
 
 // Configure axios base URL
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 axios.defaults.baseURL = API_BASE_URL;
 
-const AuthContext = createContext();
+interface AuthContextType {
+    user: User | null;
+    loading: boolean;
+    error: string | null;
+    login: (credentials: LoginData) => Promise<{ success: boolean; error?: string }>;
+    register: (userData: RegisterData) => Promise<{ success: boolean; error?: string }>;
+    logout: () => Promise<void>;
+    clearError: () => void;
+    isAuthenticated: boolean;
+}
 
-export const useAuth = () => {
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const useAuth = (): AuthContextType => {
     const context = useContext(AuthContext);
     if (!context) {
         throw new Error('useAuth must be used within an AuthProvider');
@@ -15,10 +27,14 @@ export const useAuth = () => {
     return context;
 };
 
-export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+interface AuthProviderProps {
+    children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
 
     // Configure axios defaults
     useEffect(() => {
@@ -30,13 +46,13 @@ export const AuthProvider = ({ children }) => {
 
     // Check if user is logged in on app start
     useEffect(() => {
-        const checkAuthStatus = async () => {
+        const checkAuthStatus = async (): Promise<void> => {
             const token = localStorage.getItem('auth_token');
             if (token) {
                 try {
-                    const response = await axios.get('/api/auth/profile');
-                    setUser(response.data.data.user);
-                } catch (error) {
+                    const response: AxiosResponse<AuthResponse> = await axios.get('/api/auth/profile');
+                    setUser(response.data.data?.user || null);
+                } catch (error: any) {
                     console.error('Auth check failed:', error);
                     localStorage.removeItem('auth_token');
                     delete axios.defaults.headers.common['Authorization'];
@@ -48,13 +64,13 @@ export const AuthProvider = ({ children }) => {
         checkAuthStatus();
     }, []);
 
-    const login = async (credentials) => {
+    const login = async (credentials: LoginData): Promise<{ success: boolean; error?: string }> => {
         try {
             setError(null);
             setLoading(true);
 
-            const response = await axios.post('/api/auth/login', credentials);
-            const { user: userData, token } = response.data.data;
+            const response: AxiosResponse<AuthResponse> = await axios.post('/api/auth/login', credentials);
+            const { user: userData, token } = response.data.data!;
 
             // Store token and user data
             localStorage.setItem('auth_token', token);
@@ -65,7 +81,7 @@ export const AuthProvider = ({ children }) => {
 
             setUser(userData);
             return { success: true };
-        } catch (error) {
+        } catch (error: any) {
             const errorMessage = error.response?.data?.message || 'Login failed';
             setError(errorMessage);
             return { success: false, error: errorMessage };
@@ -74,13 +90,13 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const register = async (userData) => {
+    const register = async (userData: RegisterData): Promise<{ success: boolean; error?: string }> => {
         try {
             setError(null);
             setLoading(true);
 
-            const response = await axios.post('/api/auth/register', userData);
-            const { user: newUser, token } = response.data.data;
+            const response: AxiosResponse<AuthResponse> = await axios.post('/api/auth/register', userData);
+            const { user: newUser, token } = response.data.data!;
 
             // Store token and user data
             localStorage.setItem('auth_token', token);
@@ -91,7 +107,7 @@ export const AuthProvider = ({ children }) => {
 
             setUser(newUser);
             return { success: true };
-        } catch (error) {
+        } catch (error: any) {
             const errorMessage = error.response?.data?.message || 'Registration failed';
             setError(errorMessage);
             return { success: false, error: errorMessage };
@@ -100,10 +116,10 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const logout = async () => {
+    const logout = async (): Promise<void> => {
         try {
             await axios.post('/api/auth/logout');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Logout error:', error);
         } finally {
             // Clear local storage and state
@@ -115,11 +131,11 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const clearError = () => {
+    const clearError = (): void => {
         setError(null);
     };
 
-    const value = {
+    const value: AuthContextType = {
         user,
         loading,
         error,

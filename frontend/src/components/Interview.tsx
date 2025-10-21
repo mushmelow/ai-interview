@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../contexts/AuthContext';
+import InterviewService from '../services/InterviewService';
+import type { Interview as InterviewType } from '../types';
 import {
     Video,
     Mic,
-    MicOff,
-    VideoOff,
     Play,
     Square,
     Clock,
@@ -13,11 +14,20 @@ import {
 
 const Interview: React.FC = () => {
     const { t } = useTranslation();
-    const [isRecording, setIsRecording] = useState(false);
-    const [timeElapsed, setTimeElapsed] = useState(0);
+    const { user } = useAuth();
+    const interviewService = new InterviewService();
+
+    const [isRecording, setIsRecording] = useState<boolean>(false);
+    const [timeElapsed, setTimeElapsed] = useState<number>(0);
     const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
     const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [currentInterview, setCurrentInterview] = useState<InterviewType | null>(null);
+    const [loading, setLoading] = useState<boolean>(false);
+
+    // MediaRecorder for recording
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const recordedChunksRef = useRef<Blob[]>([]);
 
     // Timer effect
     useEffect(() => {
@@ -32,7 +42,7 @@ const Interview: React.FC = () => {
 
     // Initialize media stream
     useEffect(() => {
-        const initializeMedia = async () => {
+        const initializeMedia = async (): Promise<void> => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: true,
@@ -55,26 +65,100 @@ const Interview: React.FC = () => {
                 mediaStream.getTracks().forEach(track => track.stop());
             }
         };
-    }, [videoRef]);
+    }, [videoRef, mediaStream]);
 
-    const formatTime = (seconds: number) => {
+    const formatTime = (seconds: number): string => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const handleStartInterview = () => {
-        setIsRecording(true);
-        setError(null);
+    const handleStartInterview = async (): Promise<void> => {
+        if (!user) {
+            setError('Please log in to start an interview');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Start interview session on backend
+            const interviewData = await interviewService.startInterview(
+                user.id,
+                'AI Interview Session',
+                'Automated interview with AI analysis'
+            );
+
+            setCurrentInterview(interviewData.data?.interview || null);
+
+            // Start recording
+            if (mediaStream) {
+                const mediaRecorder = new MediaRecorder(mediaStream, {
+                    mimeType: 'video/webm;codecs=vp9'
+                });
+
+                mediaRecorderRef.current = mediaRecorder;
+                recordedChunksRef.current = [];
+
+                mediaRecorder.ondataavailable = (event: BlobEvent) => {
+                    if (event.data.size > 0) {
+                        recordedChunksRef.current.push(event.data);
+                    }
+                };
+
+                mediaRecorder.start(1000); // Record in 1-second chunks
+            }
+
+            setIsRecording(true);
+        } catch (err: any) {
+            setError(err.message || 'Failed to start interview');
+            console.error('Start interview error:', err);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleFinishInterview = () => {
-        setIsRecording(false);
-        // Here you would typically stop recording and process the data
-        alert('Interview finished! Processing results...');
+    const handleFinishInterview = async (): Promise<void> => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Stop recording
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                mediaRecorderRef.current.stop();
+            }
+
+            setIsRecording(false);
+
+            // Upload recording if we have one
+            if (recordedChunksRef.current.length > 0 && currentInterview) {
+                const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+                const file = new File([blob], 'interview-recording.webm', { type: 'video/webm' });
+
+                await interviewService.uploadRecording(currentInterview.id, file);
+            }
+
+            // End interview session
+            if (currentInterview) {
+                await interviewService.endInterview(currentInterview.id);
+            }
+
+            alert('Interview completed! Your recording has been saved and will be analyzed.');
+
+            // Reset state
+            setCurrentInterview(null);
+            setTimeElapsed(0);
+            recordedChunksRef.current = [];
+        } catch (err: any) {
+            setError(err.message || 'Failed to finish interview');
+            console.error('Finish interview error:', err);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const toggleVideo = () => {
+    const toggleVideo = (): void => {
         if (mediaStream) {
             const videoTrack = mediaStream.getVideoTracks()[0];
             if (videoTrack) {
@@ -83,7 +167,7 @@ const Interview: React.FC = () => {
         }
     };
 
-    const toggleAudio = () => {
+    const toggleAudio = (): void => {
         if (mediaStream) {
             const audioTrack = mediaStream.getAudioTracks()[0];
             if (audioTrack) {
@@ -143,12 +227,14 @@ const Interview: React.FC = () => {
                     <button
                         onClick={toggleVideo}
                         className="p-3 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-colors"
+                        aria-label="Toggle video"
                     >
                         <Video className="w-6 h-6 text-white" />
                     </button>
                     <button
                         onClick={toggleAudio}
                         className="p-3 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full transition-colors"
+                        aria-label="Toggle audio"
                     >
                         <Mic className="w-6 h-6 text-white" />
                     </button>
@@ -161,18 +247,27 @@ const Interview: React.FC = () => {
                     <button
                         onClick={handleStartInterview}
                         className="btn-primary flex items-center space-x-2 px-8 py-3"
-                        disabled={!mediaStream}
+                        disabled={!mediaStream || loading}
                     >
-                        <Play className="w-5 h-5" />
-                        <span>{t('interview.start')}</span>
+                        {loading ? (
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                            <Play className="w-5 h-5" />
+                        )}
+                        <span>{loading ? 'Starting...' : t('interview.start')}</span>
                     </button>
                 ) : (
                     <button
                         onClick={handleFinishInterview}
                         className="bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-8 rounded-lg transition-colors duration-200 flex items-center space-x-2"
+                        disabled={loading}
                     >
-                        <Square className="w-5 h-5" />
-                        <span>{t('interview.finishInterview')}</span>
+                        {loading ? (
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                            <Square className="w-5 h-5" />
+                        )}
+                        <span>{loading ? 'Finishing...' : t('interview.finishInterview')}</span>
                     </button>
                 )}
             </div>
@@ -223,7 +318,3 @@ const Interview: React.FC = () => {
 };
 
 export default Interview;
-
-
-
-

@@ -24,5 +24,3 @@ export * from '../constants';
 
 // Styles
 export { theme } from '../styles/theme';
-
-
