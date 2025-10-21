@@ -1,0 +1,5 @@
+{"level":"info","message":"🚀 Server running on port 54112","service":"ai-interview-backend","timestamp":"2025-10-07 11:34:42"}
+{"level":"info","message":"📊 Health check: http://localhost:54112/health","service":"ai-interview-backend","timestamp":"2025-10-07 11:34:42"}
+{"level":"info","message":"🧪 Test endpoint: http://localhost:54112/api/test","service":"ai-interview-backend","timestamp":"2025-10-07 11:34:42"}
+{"level":"info","message":"🔒 Consent API: http://localhost:54112/api/consent","service":"ai-interview-backend","timestamp":"2025-10-07 11:34:42"}
+{"level":"info","message":"🔐 Auth API: http://localhost:54112/api/auth","service":"ai-interview-backend","timestamp":"2025-10-07 11:34:42"}
