@@ -5,6 +5,10 @@ export { default as ConsentFlow } from './features/ConsentFlow';
 export { default as ConsentStatus } from './features/ConsentStatus';
 export { default as LoginForm } from './auth/LoginForm';
 export { default as RegisterForm } from './auth/RegisterForm';
+export { default as Interview } from './Interview';
+export { default as QuestionGenerator } from './QuestionGenerator';
+export { default as QuestionDisplay } from './QuestionDisplay';
+export { default as VoiceInteraction } from './VoiceInteraction';
 
 // Pages
 export { default as Dashboard } from '../pages/Dashboard';

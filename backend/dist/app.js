@@ -13,12 +13,14 @@ const consent_1 = __importDefault(require("./routes/consent"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const interview_1 = __importDefault(require("./routes/interview"));
 const admin_1 = __importDefault(require("./routes/admin"));
+const questions_1 = __importDefault(require("./routes/questions"));
+const analysis_1 = __importDefault(require("./routes/analysis"));
 dotenv_1.default.config();
 const logger = {
     info: (message) => console.log(message)
 };
 const app = (0, express_1.default)();
-const PORT = parseInt(process.env.PORT || '3001', 10);
+const PORT = parseInt(process.env.PORT || '4000', 10);
 app.use((0, cors_1.default)({
     origin: process.env.FRONTEND_URL || 'http://localhost:3005'
 }));
@@ -44,6 +46,8 @@ app.use('/api/consent', consent_1.default);
 app.use('/api/auth', auth_1.default);
 app.use('/api/interviews', interview_1.default);
 app.use('/api/admin', admin_1.default);
+app.use('/api/questions', questions_1.default);
+app.use('/api/analysis', analysis_1.default);
 app.use(errorHandler_1.default);
 app.listen(PORT, () => {
     logger.info(`🚀 Server running on port ${PORT}`);
@@ -53,6 +57,7 @@ app.listen(PORT, () => {
     logger.info(`🔐 Auth API: http://localhost:${PORT}/api/auth`);
     logger.info(`🎥 Interview API: http://localhost:${PORT}/api/interviews`);
     logger.info(`🔧 Admin API: http://localhost:${PORT}/api/admin`);
+    logger.info(`❓ Questions API: http://localhost:${PORT}/api/questions`);
 });
 exports.default = app;
 //# sourceMappingURL=app.js.map

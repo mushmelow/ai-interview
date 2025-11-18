@@ -12,6 +12,8 @@ import consentRoutes from './routes/consent';
 import authRoutes from './routes/auth';
 import interviewRoutes from './routes/interview';
 import adminRoutes from './routes/admin';
+import questionRoutes from './routes/questions';
+import analysisRoutes from './routes/analysis';
 
 // Load environment variables
 dotenv.config();
@@ -62,6 +64,8 @@ app.use('/api/consent', consentRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/interviews', interviewRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/questions', questionRoutes);
+app.use('/api/analysis', analysisRoutes);
 
 // Error handling middleware
 app.use(errorHandler);
@@ -75,6 +79,7 @@ app.listen(PORT, () => {
     logger.info(`🔐 Auth API: http://localhost:${PORT}/api/auth`);
     logger.info(`🎥 Interview API: http://localhost:${PORT}/api/interviews`);
     logger.info(`🔧 Admin API: http://localhost:${PORT}/api/admin`);
+    logger.info(`❓ Questions API: http://localhost:${PORT}/api/questions`);
 });
 
 export default app;

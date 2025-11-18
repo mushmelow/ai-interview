@@ -105,10 +105,12 @@ class AuthController {
             res.status(201).json(response);
 
         } catch (error: any) {
+            console.error('Registration error details:', error);
             logger.error(`Error in user registration: ${error.message}`);
             res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Internal server error',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }
     }
@@ -180,10 +182,12 @@ class AuthController {
             res.json(response);
 
         } catch (error: any) {
+            console.error('Login error details:', error);
             logger.error(`Error in user login: ${error.message}`);
             res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Internal server error',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }
     }

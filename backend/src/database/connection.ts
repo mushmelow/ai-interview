@@ -1,19 +1,11 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// Debug environment variables
-console.log('Database connection config:');
-console.log('DB_HOST:', process.env.DB_HOST || 'localhost');
-console.log('DB_PORT:', process.env.DB_PORT || 5432);
-console.log('DB_USER:', process.env.DB_USER || 'zhenghao');
-console.log('DB_PASSWORD:', process.env.DB_PASSWORD ? '***' : '');
-console.log('DB_NAME:', process.env.DB_NAME || 'ai_interview_db');
-
 // Create PostgreSQL connection pool
 const pool = new Pool({
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
-    user: 'zhenghao', // Force correct user
+    user: process.env.DB_USER || 'zhenghao',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'ai_interview_db',
     max: 20, // Maximum number of clients in the pool

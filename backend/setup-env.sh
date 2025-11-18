@@ -29,6 +29,10 @@ export REDIS_PASSWORD=
 # Logging
 export LOG_LEVEL=info
 
+# OpenAI Configuration
+export OPENAI_API_KEY=OPENAI_API_KEY_REDACTED
+export OPENAI_API_URL=https://api.openai.com/v1/chat/completions
+
 echo "✅ Environment variables set successfully!"
 echo ""
 echo "📋 Current database configuration:"

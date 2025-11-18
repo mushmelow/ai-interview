@@ -1,4 +1,4 @@
-import { query } from '../connection';
+const { query } = require('../connection');
 import { User as UserType, CreateUserData, UpdateUserData } from '../../types';
 
 export class User implements UserType {
