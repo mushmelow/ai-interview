@@ -1,0 +1,29 @@
+services:
+  fastapi-dev:
+    build: 
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+      target: development
+    container_name: fastapi-development
+    ports:
+      - "8000:8000"
+      - "5678:5678"
+    models:
+      - llm
+    volumes:
+      - ..:/cv-parser
+
+  # fastapi-prod:
+  #   build:
+  #     context: ..
+  #     dockerfile: .devcontainer/Dockerfile
+  #     target: production
+  #   container_name: fastapi-production
+  #   ports:
+  #     - "80:8000"
+  #   models:
+  #     - llm    
+
+models:
+  llm:
+    model: ai/gpt-oss:20B-UD-Q4_K_XL
