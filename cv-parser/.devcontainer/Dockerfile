@@ -38,11 +38,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # ENTRYPOINT defines the main debugger command
-ENTRYPOINT ["python", "-m", "debugpy", "--listen", "0.0.0.0:5678"]
-
-# CMD provides the arguments to the ENTRYPOINT: what to debug
-CMD ["-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-
+ENTRYPOINT ["bash", "-c", "python -m debugpy --listen 0.0.0.0:5678 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
 
 # Stage 3: The "production" stage
 FROM base AS production
