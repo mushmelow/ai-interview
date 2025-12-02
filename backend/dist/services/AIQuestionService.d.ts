@@ -23,6 +23,7 @@ declare class AIQuestionService {
     private getExperienceLevelContext;
     private getCategoryContext;
     private parseAIResponse;
+    private extractQuestionsFromText;
     private getRelevantTemplates;
     private createQuestionSession;
     private storeGeneratedQuestions;

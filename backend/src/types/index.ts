@@ -72,6 +72,7 @@ export interface ConsentResponse {
     consentGiven: boolean;
     consentDate: string | null;
     consentVersion: string;
+    consents?: ConsentData | null;
 }
 
 // Interview types

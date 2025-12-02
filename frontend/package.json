@@ -52,8 +52,7 @@
         ]
     },
     "devDependencies": {
-        "@types/jest": "^29.5.8",
-        "@types/lucide-react": "^0.294.0"
+        "@types/jest": "^29.5.8"
     },
-    "proxy": "http://localhost:4000"
+    "proxy": "http://localhost:3500"
 }

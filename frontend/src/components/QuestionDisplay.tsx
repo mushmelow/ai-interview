@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GeneratedQuestion } from '../services/QuestionService';
+import AnswerService from '../services/AnswerService';
 
 interface QuestionDisplayProps {
     questions: GeneratedQuestion[];
@@ -17,6 +18,37 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
     onBack
 }) => {
     const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set());
+    const [answers, setAnswers] = useState<{ [questionId: number]: string }>({});
+    const [submitting, setSubmitting] = useState<{ [questionId: number]: boolean }>({});
+    const [submitted, setSubmitted] = useState<{ [questionId: number]: boolean }>({});
+    const [errors, setErrors] = useState<{ [questionId: number]: string | null }>({});
+    const answerService = new AnswerService();
+
+    // Load existing answers on mount
+    useEffect(() => {
+        const loadAnswers = async () => {
+            try {
+                const response = await answerService.getSessionAnswers(sessionId);
+                if (response.success && response.data) {
+                    const answersMap: { [questionId: number]: string } = {};
+                    const submittedMap: { [questionId: number]: boolean } = {};
+                    response.data.forEach((answer: any) => {
+                        // Find the question ID from the questions array
+                        const question = questions.find(q => q.id === answer.questionId);
+                        if (question) {
+                            answersMap[question.id] = answer.answer;
+                            submittedMap[question.id] = true;
+                        }
+                    });
+                    setAnswers(answersMap);
+                    setSubmitted(submittedMap);
+                }
+            } catch (error) {
+                console.error('Error loading answers:', error);
+            }
+        };
+        loadAnswers();
+    }, [sessionId]);
 
     const toggleQuestionExpansion = (questionId: number) => {
         const newExpanded = new Set(expandedQuestions);
@@ -44,6 +76,41 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
             case 'situational': return '#28a745';
             case 'cultural': return '#fd7e14';
             default: return '#6c757d';
+        }
+    };
+
+    const handleAnswerChange = (questionId: number, value: string) => {
+        setAnswers(prev => ({ ...prev, [questionId]: value }));
+        setErrors(prev => ({ ...prev, [questionId]: null }));
+    };
+
+    const handleSubmitAnswer = async (questionId: number) => {
+        const answer = answers[questionId]?.trim();
+        if (!answer) {
+            setErrors(prev => ({ ...prev, [questionId]: 'Please enter an answer' }));
+            return;
+        }
+
+        setSubmitting(prev => ({ ...prev, [questionId]: true }));
+        setErrors(prev => ({ ...prev, [questionId]: null }));
+
+        try {
+            const response = await answerService.submitAnswer({
+                questionId: questionId,
+                sessionId: sessionId,
+                answer: answer,
+                answerType: 'text'
+            });
+
+            if (response.success) {
+                setSubmitted(prev => ({ ...prev, [questionId]: true }));
+            } else {
+                setErrors(prev => ({ ...prev, [questionId]: response.message || 'Failed to submit answer' }));
+            }
+        } catch (error: any) {
+            setErrors(prev => ({ ...prev, [questionId]: error.response?.data?.message || 'Failed to submit answer' }));
+        } finally {
+            setSubmitting(prev => ({ ...prev, [questionId]: false }));
         }
     };
 
@@ -182,6 +249,78 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
                                         <strong>Context:</strong> {question.context}
                                     </div>
                                 )}
+
+                                {/* Answer Input Section */}
+                                <div style={{
+                                    marginTop: '20px',
+                                    padding: '15px',
+                                    backgroundColor: '#f8f9fa',
+                                    border: '1px solid #dee2e6',
+                                    borderRadius: '4px'
+                                }}>
+                                    <label style={{
+                                        display: 'block',
+                                        fontWeight: 'bold',
+                                        marginBottom: '10px',
+                                        color: '#495057'
+                                    }}>
+                                        Your Answer:
+                                    </label>
+                                    <textarea
+                                        value={answers[question.id] || ''}
+                                        onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                                        placeholder="Type your answer here..."
+                                        rows={4}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px',
+                                            border: errors[question.id] ? '2px solid #dc3545' : '1px solid #ced4da',
+                                            borderRadius: '4px',
+                                            fontSize: '14px',
+                                            fontFamily: 'inherit',
+                                            resize: 'vertical',
+                                            marginBottom: '10px'
+                                        }}
+                                        disabled={submitting[question.id] || submitted[question.id]}
+                                    />
+                                    {errors[question.id] && (
+                                        <div style={{
+                                            color: '#dc3545',
+                                            fontSize: '14px',
+                                            marginBottom: '10px'
+                                        }}>
+                                            {errors[question.id]}
+                                        </div>
+                                    )}
+                                    {submitted[question.id] && (
+                                        <div style={{
+                                            color: '#28a745',
+                                            fontSize: '14px',
+                                            marginBottom: '10px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '5px'
+                                        }}>
+                                            ✓ Answer submitted successfully
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={() => handleSubmitAnswer(question.id)}
+                                        disabled={submitting[question.id] || submitted[question.id] || !answers[question.id]?.trim()}
+                                        style={{
+                                            padding: '8px 16px',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            backgroundColor: submitted[question.id] ? '#6c757d' : submitting[question.id] ? '#6c757d' : '#007bff',
+                                            color: 'white',
+                                            cursor: (submitting[question.id] || submitted[question.id] || !answers[question.id]?.trim()) ? 'not-allowed' : 'pointer',
+                                            fontSize: '14px',
+                                            opacity: (submitting[question.id] || submitted[question.id] || !answers[question.id]?.trim()) ? 0.6 : 1
+                                        }}
+                                    >
+                                        {submitting[question.id] ? 'Submitting...' : submitted[question.id] ? 'Submitted' : 'Submit Answer'}
+                                    </button>
+                                </div>
                             </div>
 
                             <button
