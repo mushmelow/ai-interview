@@ -43,7 +43,7 @@ export const storage = {
 
 // API utilities
 export const apiRequest = async (url, options = {}) => {
-    const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3500';
     const fullURL = `${baseURL}${url}`;
 
     const defaultOptions = {

@@ -104,7 +104,57 @@ const QuestionGenerator: React.FC<QuestionGeneratorProps> = ({ onQuestionsGenera
     };
 
     return (
-        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px', position: 'relative' }}>
+            {/* Loading Overlay */}
+            {loading && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999
+                }}>
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '12px',
+                        padding: '40px',
+                        textAlign: 'center',
+                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+                        maxWidth: '400px'
+                    }}>
+                        <div style={{
+                            display: 'inline-block',
+                            width: '50px',
+                            height: '50px',
+                            border: '4px solid #f3f3f3',
+                            borderTop: '4px solid #007bff',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite',
+                            marginBottom: '20px'
+                        }}></div>
+                        <h3 style={{ marginBottom: '10px', color: '#333' }}>Generating Questions</h3>
+                        <p style={{ color: '#666', margin: 0 }}>
+                            AI is creating personalized questions for <strong>{formData.position}</strong>...
+                        </p>
+                        <p style={{ color: '#999', fontSize: '14px', marginTop: '10px' }}>
+                            This may take a few moments
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* Add CSS animation for spinner */}
+            <style>{`
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `}</style>
             {/* Authentication Check */}
             {!user && (
                 <div style={{
@@ -161,7 +211,9 @@ const QuestionGenerator: React.FC<QuestionGeneratorProps> = ({ onQuestionsGenera
                 border: '1px solid #ddd',
                 borderRadius: '8px',
                 padding: '30px',
-                marginBottom: '20px'
+                marginBottom: '20px',
+                opacity: loading ? 0.6 : 1,
+                pointerEvents: loading ? 'none' : 'auto'
             }}>
                 <h2 style={{ marginBottom: '20px' }}>Interview Configuration</h2>
 
@@ -332,10 +384,25 @@ const QuestionGenerator: React.FC<QuestionGeneratorProps> = ({ onQuestionsGenera
                             color: 'white',
                             cursor: loading ? 'not-allowed' : 'pointer',
                             fontSize: '16px',
-                            minWidth: '200px'
+                            minWidth: '200px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px'
                         }}
                     >
-                        {loading ? 'Generating...' : 'Generate Questions'}
+                        {loading && (
+                            <span style={{
+                                display: 'inline-block',
+                                width: '16px',
+                                height: '16px',
+                                border: '2px solid #ffffff',
+                                borderTop: '2px solid transparent',
+                                borderRadius: '50%',
+                                animation: 'spin 1s linear infinite'
+                            }}></span>
+                        )}
+                        {loading ? 'Generating Questions...' : 'Generate Questions'}
                     </button>
                 </div>
             </div>

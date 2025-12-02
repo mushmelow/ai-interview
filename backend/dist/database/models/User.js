@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.User = void 0;
-const connection_1 = require("../connection");
+const { query } = require('../connection');
 class User {
     constructor(data) {
         this.id = data.id;
@@ -23,7 +23,7 @@ class User {
         `;
         const values = [email, passwordHash, role, firstName, lastName];
         try {
-            const result = await (0, connection_1.query)(queryText, values);
+            const result = await query(queryText, values);
             return new User(result.rows[0]);
         }
         catch (error) {
@@ -33,7 +33,7 @@ class User {
     static async findById(id) {
         const queryText = 'SELECT * FROM users WHERE id = $1 AND is_active = true';
         try {
-            const result = await (0, connection_1.query)(queryText, [id]);
+            const result = await query(queryText, [id]);
             return result.rows.length > 0 ? new User(result.rows[0]) : null;
         }
         catch (error) {
@@ -43,7 +43,7 @@ class User {
     static async findByEmail(email) {
         const queryText = 'SELECT * FROM users WHERE email = $1 AND is_active = true';
         try {
-            const result = await (0, connection_1.query)(queryText, [email]);
+            const result = await query(queryText, [email]);
             return result.rows.length > 0 ? new User(result.rows[0]) : null;
         }
         catch (error) {
@@ -74,7 +74,7 @@ class User {
             RETURNING *
         `;
         try {
-            const result = await (0, connection_1.query)(queryText, values);
+            const result = await query(queryText, values);
             if (result.rows.length > 0) {
                 return new User(result.rows[0]);
             }
@@ -87,7 +87,7 @@ class User {
     async delete() {
         const queryText = 'UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1';
         try {
-            await (0, connection_1.query)(queryText, [this.id]);
+            await query(queryText, [this.id]);
             this.isActive = false;
             return true;
         }
@@ -103,7 +103,7 @@ class User {
             LIMIT $1 OFFSET $2
         `;
         try {
-            const result = await (0, connection_1.query)(queryText, [limit, offset]);
+            const result = await query(queryText, [limit, offset]);
             return result.rows.map((row) => new User(row));
         }
         catch (error) {

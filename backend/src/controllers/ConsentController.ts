@@ -5,18 +5,19 @@ import {
     ConsentResponse,
     ApiResponse
 } from '../types';
-
-// Simple in-memory consent storage (same as simple-auth.js)
-const consents: Record<string, ConsentRecord> = {};
+const Consent = require('../database/models/Consent');
 
 class ConsentController {
     constructor() {
-        // No need for ConsentService in this simple implementation
+        // Using database Consent model for persistent storage
     }
 
-    // Create consent record
+    // Create consent record - saves to database permanently
     async createConsent(req: Request, res: Response): Promise<void> {
         try {
+            // Get authenticated user ID from JWT token (if available)
+            const authenticatedUserId = (req as any).user?.userId;
+
             const {
                 userId,
                 consents: consentData,
@@ -26,61 +27,70 @@ class ConsentController {
                 consentVersion
             }: ConsentRequest = req.body;
 
-            // Store consent data
-            consents[userId] = {
-                userId: userId,
-                consents: consentData,
-                consentGiven: true,
-                consentDate: new Date().toISOString(),
-                consentVersion: consentVersion || "1.0",
-                ipAddress: ipAddress || 'unknown',
-                userAgent: userAgent || 'unknown',
-                timestamp: timestamp || new Date().toISOString()
-            };
+            // Use authenticated user ID if available, otherwise use provided userId
+            const finalUserId = authenticatedUserId ? authenticatedUserId.toString() : userId;
 
-            console.log(`Consent stored for user ${userId}:`, consentData);
+            // Save to database permanently
+            const consent = await Consent.create({
+                userId: finalUserId,
+                ipAddress: ipAddress || req.ip || 'unknown',
+                consents: consentData,
+                version: consentVersion || "1.0"
+            });
+
+            console.log(`Consent saved to database for user ${finalUserId}:`, consentData);
 
             const response: ApiResponse<ConsentResponse> = {
                 success: true,
-                message: 'Consent recorded successfully',
+                message: 'Consent recorded successfully and saved permanently',
                 data: {
-                    userId: userId,
+                    userId: finalUserId,
                     consentGiven: true,
-                    consentDate: consents[userId].consentDate,
-                    consentVersion: consents[userId].consentVersion
+                    consentDate: consent.timestamp,
+                    consentVersion: consent.version
                 }
             };
 
             res.json({
                 ...response,
-                consentId: `consent_${userId}_${Date.now()}`,
-                timestamp: new Date().toISOString()
+                consentId: consent.id.toString(),
+                timestamp: consent.timestamp
             });
         } catch (error: any) {
             console.error('Consent update error:', error);
             res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Internal server error',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }
     }
 
-    // Get user consent
+    // Get user consent - loads from database
     async getConsent(req: Request, res: Response): Promise<void> {
         try {
+            // Get authenticated user ID from JWT token (if available)
+            const authenticatedUserId = (req as any).user?.userId;
             const { userId } = req.params;
 
-            // Check if user has given consent
-            const userConsent = consents[userId];
+            // Use authenticated user ID if available, otherwise use provided userId
+            const finalUserId = authenticatedUserId ? authenticatedUserId.toString() : userId;
+
+            // Load from database
+            const userConsent = await Consent.findByUserId(finalUserId);
+
+            // Check if all required consents are given
+            const hasValidConsent = userConsent ? await Consent.hasValidConsent(finalUserId) : false;
 
             const response: ApiResponse<ConsentResponse> = {
                 success: true,
                 message: 'Consent status retrieved successfully',
                 data: {
-                    userId: userId,
-                    consentGiven: userConsent ? userConsent.consentGiven : false,
-                    consentDate: userConsent ? userConsent.consentDate : null,
-                    consentVersion: userConsent ? userConsent.consentVersion : "1.0"
+                    userId: finalUserId,
+                    consentGiven: hasValidConsent,
+                    consentDate: userConsent ? userConsent.timestamp : null,
+                    consentVersion: userConsent ? userConsent.version : "1.0",
+                    consents: userConsent ? userConsent.consents : null
                 }
             };
 
@@ -89,17 +99,25 @@ class ConsentController {
             console.error('Consent check error:', error);
             res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Internal server error',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }
     }
 
-    // Withdraw consent
+    // Withdraw consent - removes from database
     async withdrawConsent(req: Request, res: Response): Promise<void> {
         try {
+            // Get authenticated user ID from JWT token (if available)
+            const authenticatedUserId = (req as any).user?.userId;
             const { userId } = req.params;
 
-            if (!consents[userId]) {
+            // Use authenticated user ID if available, otherwise use provided userId
+            const finalUserId = authenticatedUserId ? authenticatedUserId.toString() : userId;
+
+            const deleted = await Consent.deleteByUserId(finalUserId);
+
+            if (!deleted) {
                 res.status(404).json({
                     success: false,
                     message: 'No consent record found for this user'
@@ -107,9 +125,7 @@ class ConsentController {
                 return;
             }
 
-            delete consents[userId];
-
-            console.log(`Consent withdrawn for user: ${userId}`);
+            console.log(`Consent withdrawn for user: ${finalUserId}`);
 
             const response: ApiResponse = {
                 success: true,
@@ -122,18 +138,25 @@ class ConsentController {
             console.error('Error withdrawing consent:', error);
             res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Internal server error',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }
     }
 
-    // Get consent audit trail
+    // Get consent audit trail - loads from database
     async getConsentAudit(req: Request, res: Response): Promise<void> {
         try {
+            // Get authenticated user ID from JWT token (if available)
+            const authenticatedUserId = (req as any).user?.userId;
             const { userId } = req.params;
 
-            const userConsent = consents[userId];
-            if (!userConsent) {
+            // Use authenticated user ID if available, otherwise use provided userId
+            const finalUserId = authenticatedUserId ? authenticatedUserId.toString() : userId;
+
+            const consentHistory = await Consent.findAllByUserId(finalUserId);
+
+            if (!consentHistory || consentHistory.length === 0) {
                 res.status(404).json({
                     success: false,
                     message: 'No consent records found for this user'
@@ -145,7 +168,15 @@ class ConsentController {
                 success: true,
                 message: 'Consent audit trail retrieved successfully',
                 data: {
-                    auditTrail: [userConsent]
+                    auditTrail: consentHistory.map((consent: any) => ({
+                        userId: consent.userId,
+                        consents: consent.consents,
+                        consentGiven: true,
+                        consentDate: consent.timestamp,
+                        consentVersion: consent.version,
+                        ipAddress: consent.ipAddress,
+                        timestamp: consent.timestamp
+                    }))
                 }
             };
 
@@ -155,7 +186,8 @@ class ConsentController {
             console.error('Error getting consent audit:', error);
             res.status(500).json({
                 success: false,
-                message: 'Internal server error'
+                message: 'Internal server error',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }
     }

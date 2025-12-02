@@ -13,7 +13,7 @@ export DB_PASSWORD=
 export DB_NAME=ai_interview_db
 
 # Server Configuration
-export PORT=4000
+export PORT=3500
 export NODE_ENV=development
 export FRONTEND_URL=http://localhost:3005
 

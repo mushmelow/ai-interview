@@ -1,11 +1,25 @@
 // Consent Service - Handles GDPR consent management
 class ConsentService {
     constructor() {
-        this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+        this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3500';
     }
 
-    // Generate a unique user ID for consent tracking
-    generateUserId() {
+    // Get user ID - prefer authenticated user ID, fallback to generated ID
+    getUserId() {
+        // First, try to get authenticated user ID from localStorage
+        const userData = localStorage.getItem('user_data');
+        if (userData) {
+            try {
+                const user = JSON.parse(userData);
+                if (user && user.id) {
+                    return user.id.toString();
+                }
+            } catch (e) {
+                console.warn('Could not parse user data:', e);
+            }
+        }
+
+        // Fallback: Generate a unique user ID for consent tracking (for non-authenticated users)
         let userId = localStorage.getItem('consent_user_id');
         if (!userId) {
             userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
@@ -29,7 +43,8 @@ class ConsentService {
     // Submit consent to backend
     async submitConsent(consents) {
         try {
-            const userId = this.generateUserId();
+            const userId = this.getUserId();
+            const token = localStorage.getItem('auth_token');
             const ipAddress = await this.getUserIP();
             const userAgent = navigator.userAgent;
 
@@ -45,11 +60,18 @@ class ConsentService {
 
             console.log('Submitting consent to backend:', consentData);
 
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+
+            // Add authentication token if available
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             const response = await fetch(`${this.baseURL}/api/consent`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: headers,
                 body: JSON.stringify(consentData),
             });
 
@@ -74,8 +96,17 @@ class ConsentService {
     // Check if user has given consent
     async checkConsent() {
         try {
-            const userId = this.generateUserId();
-            const response = await fetch(`${this.baseURL}/api/consent/${userId}`);
+            const userId = this.getUserId();
+            const token = localStorage.getItem('auth_token');
+
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(`${this.baseURL}/api/consent/${userId}`, {
+                headers: headers
+            });
 
             if (response.ok) {
                 const result = await response.json();
@@ -92,9 +123,17 @@ class ConsentService {
     // Withdraw consent (GDPR right to withdraw)
     async withdrawConsent() {
         try {
-            const userId = this.generateUserId();
+            const userId = this.getUserId();
+            const token = localStorage.getItem('auth_token');
+
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             const response = await fetch(`${this.baseURL}/api/consent/${userId}`, {
                 method: 'DELETE',
+                headers: headers
             });
 
             if (response.ok) {
@@ -117,8 +156,17 @@ class ConsentService {
     // Get consent audit trail (for user transparency)
     async getConsentAudit() {
         try {
-            const userId = this.generateUserId();
-            const response = await fetch(`${this.baseURL}/api/consent/audit/${userId}`);
+            const userId = this.getUserId();
+            const token = localStorage.getItem('auth_token');
+
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(`${this.baseURL}/api/consent/audit/${userId}`, {
+                headers: headers
+            });
 
             if (response.ok) {
                 const result = await response.json();

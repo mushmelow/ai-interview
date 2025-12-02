@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const connection_1 = require("../database/connection");
+const { query } = require('../database/connection');
 class AIQuestionService {
     constructor() {
         this.openaiApiKey = process.env.OPENAI_API_KEY || '';
@@ -32,10 +32,10 @@ class AIQuestionService {
     }
     async getSessionQuestions(sessionId) {
         try {
-            const result = await (0, connection_1.query)(`SELECT * FROM generated_questions 
+            const result = await query(`SELECT * FROM generated_questions 
                  WHERE session_id = $1 
                  ORDER BY order_index ASC`, [sessionId]);
-            return result.rows.map(row => ({
+            return result.rows.map((row) => ({
                 id: row.id,
                 question: row.question,
                 category: row.category,
@@ -526,20 +526,68 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
             }));
         }
         catch (error) {
-            console.error('Error parsing AI response:', error);
-            throw new Error('Invalid AI response format');
+            console.log('JSON parsing failed, trying text extraction...');
+            return this.extractQuestionsFromText(content, request);
         }
+    }
+    extractQuestionsFromText(content, request) {
+        const questions = [];
+        const questionPatterns = [
+            /(\d+\.\s*[^?]+\?)/g,
+            /([A-Z][^?]+\?)/g,
+            /(Question\s*\d*:?\s*[^?]+\?)/gi
+        ];
+        let extractedTexts = [];
+        for (const pattern of questionPatterns) {
+            const matches = content.match(pattern);
+            if (matches && matches.length > 0) {
+                extractedTexts = matches;
+                break;
+            }
+        }
+        if (extractedTexts.length === 0) {
+            const lines = content.split('\n').filter(line => line.trim().length > 10 &&
+                (line.includes('?') || line.includes('Question')));
+            extractedTexts = lines.slice(0, 5);
+        }
+        extractedTexts.forEach((text, index) => {
+            if (text.trim().length > 10) {
+                questions.push({
+                    id: (Date.now() + index).toString(),
+                    question: text.trim().replace(/^\d+\.\s*/, ''),
+                    category: request.categories[0] || 'technical',
+                    type: 'open-ended',
+                    difficulty: request.experienceLevel,
+                    context: request.customContext,
+                    followUpQuestions: [],
+                    expectedKeywords: []
+                });
+            }
+        });
+        if (questions.length === 0) {
+            questions.push({
+                id: Date.now().toString(),
+                question: `Tell me about your experience with ${request.position} and how you would approach solving complex problems in this role.`,
+                category: request.categories[0] || 'technical',
+                type: 'open-ended',
+                difficulty: request.experienceLevel,
+                context: request.customContext,
+                followUpQuestions: [],
+                expectedKeywords: []
+            });
+        }
+        return questions.slice(0, request.numberOfQuestions);
     }
     async getRelevantTemplates(request) {
         try {
-            let result = await (0, connection_1.query)(`SELECT qt.*, qc.name as category_name 
+            let result = await query(`SELECT qt.*, qc.name as category_name 
                  FROM question_templates qt
                  JOIN question_categories qc ON qt.category_id = qc.id
                  WHERE qt.is_active = true 
                  AND qt.difficulty = $1
                  AND qc.name = ANY($2)
                  ORDER BY RANDOM()`, [request.difficulty, request.categories]);
-            let templates = result.rows.map(row => ({
+            let templates = result.rows.map((row) => ({
                 id: row.id,
                 category: row.category_name,
                 type: row.type,
@@ -548,7 +596,7 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
                 difficulty: row.difficulty
             }));
             if (templates.length < request.numberOfQuestions) {
-                const additionalResult = await (0, connection_1.query)(`SELECT qt.*, qc.name as category_name 
+                const additionalResult = await query(`SELECT qt.*, qc.name as category_name 
                      FROM question_templates qt
                      JOIN question_categories qc ON qt.category_id = qc.id
                      WHERE qt.is_active = true 
@@ -556,7 +604,7 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
                      AND qc.name NOT IN (SELECT unnest($2::text[]))
                      ORDER BY RANDOM()
                      LIMIT $3`, [request.difficulty, request.categories, request.numberOfQuestions - templates.length]);
-                const additionalTemplates = additionalResult.rows.map(row => ({
+                const additionalTemplates = additionalResult.rows.map((row) => ({
                     id: row.id,
                     category: row.category_name,
                     type: row.type,
@@ -571,14 +619,14 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
                 for (const difficulty of difficulties) {
                     if (templates.length >= request.numberOfQuestions)
                         break;
-                    const fallbackResult = await (0, connection_1.query)(`SELECT qt.*, qc.name as category_name 
+                    const fallbackResult = await query(`SELECT qt.*, qc.name as category_name 
                          FROM question_templates qt
                          JOIN question_categories qc ON qt.category_id = qc.id
                          WHERE qt.is_active = true 
                          AND qt.difficulty = $1
                          ORDER BY RANDOM()
                          LIMIT $2`, [difficulty, request.numberOfQuestions - templates.length]);
-                    const fallbackTemplates = fallbackResult.rows.map(row => ({
+                    const fallbackTemplates = fallbackResult.rows.map((row) => ({
                         id: row.id,
                         category: row.category_name,
                         type: row.type,
@@ -597,7 +645,7 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
         }
     }
     async createQuestionSession(request, sessionId) {
-        await (0, connection_1.query)(`INSERT INTO question_sessions (user_id, session_id, position, experience_level, categories, difficulty, custom_context)
+        await query(`INSERT INTO question_sessions (user_id, session_id, position, experience_level, categories, difficulty, custom_context)
              VALUES ($1, $2, $3, $4, $5, $6, $7)`, [
             request.userId,
             sessionId,
@@ -611,7 +659,7 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
     async storeGeneratedQuestions(sessionId, questions) {
         for (let i = 0; i < questions.length; i++) {
             const q = questions[i];
-            await (0, connection_1.query)(`INSERT INTO generated_questions (session_id, question, category, type, difficulty, context, follow_up_questions, expected_keywords, order_index)
+            await query(`INSERT INTO generated_questions (session_id, question, category, type, difficulty, context, follow_up_questions, expected_keywords, order_index)
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`, [
                 sessionId,
                 q.question,

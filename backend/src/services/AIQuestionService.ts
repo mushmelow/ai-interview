@@ -27,12 +27,12 @@ class AIQuestionService {
             // Generate questions using AI ONLY - no template fallback
             const questions = await this.generateQuestionsWithAI(request);
 
-            // Store generated questions
-            await this.storeGeneratedQuestions(sessionId, questions);
+            // Store generated questions and get database IDs
+            const storedQuestions = await this.storeGeneratedQuestions(sessionId, questions);
 
             return {
                 success: true,
-                questions,
+                questions: storedQuestions, // Return questions with database IDs
                 sessionId,
                 metadata: {
                     position: request.position,
@@ -595,26 +595,312 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
         return categories.map(cat => `- ${cat}: ${categoryDescriptions[cat] || 'General assessment of this area'}`).join('\n');
     }
 
+    // Clean question text - removes markdown, leading text, and extracts just the question
+    private cleanQuestionText(text: string): string {
+        if (!text) return text;
+
+        let cleaned = text;
+
+        // Remove markdown code blocks (```json, ```, etc.)
+        cleaned = cleaned.replace(/```json\s*/gi, '').replace(/```\s*/g, '').replace(/```/g, '');
+
+        // Remove leading descriptive text patterns (before any JSON or question)
+        cleaned = cleaned.replace(/^Here are \d+.*?questions?.*?:?\s*/i, '');
+        cleaned = cleaned.replace(/^Here are.*?interview questions?.*?:?\s*/i, '');
+        cleaned = cleaned.replace(/^The following.*?questions?.*?:?\s*/i, '');
+        cleaned = cleaned.replace(/^.*?highly specific.*?questions?.*?:?\s*/i, '');
+        cleaned = cleaned.replace(/^.*?for a.*?position.*?:?\s*/i, '');
+
+        // If the entire text is a JSON structure, extract the question from it
+        // Try to extract JSON array first
+        const jsonArrayMatch = cleaned.match(/\[\s*\{[\s\S]*?\}\s*\]/);
+        if (jsonArrayMatch) {
+            try {
+                const jsonData = JSON.parse(jsonArrayMatch[0]);
+                if (Array.isArray(jsonData) && jsonData.length > 0 && jsonData[0].question) {
+                    return jsonData[0].question.trim();
+                }
+            } catch (e) {
+                // Continue with other extraction methods
+            }
+        }
+
+        // Remove any JSON array structure that might be in the text (after trying to extract)
+        cleaned = cleaned.replace(/\[\s*\{[\s\S]*?\}\s*\]/g, '');
+
+        // Remove any JSON object structure and extract question
+        const jsonObjectMatch = cleaned.match(/\{\s*"question"\s*:\s*"([^"]+)"[\s\S]*?\}/);
+        if (jsonObjectMatch && jsonObjectMatch[1]) {
+            return jsonObjectMatch[1].trim();
+        }
+        cleaned = cleaned.replace(/\{\s*"question"\s*:\s*"([^"]+)"[\s\S]*?\}/g, '$1');
+
+        // Try to extract incomplete JSON array (missing closing bracket)
+        const incompleteArrayMatch = cleaned.match(/\[\s*\{[\s\S]*/);
+        if (incompleteArrayMatch) {
+            const jsonStr = incompleteArrayMatch[0];
+            // Try to extract question from incomplete JSON
+            const questionMatch = jsonStr.match(/"question"\s*:\s*"([^"]*(?:"[^"]*")*[^"]*)/);
+            if (questionMatch && questionMatch[1]) {
+                // Handle escaped quotes and incomplete strings
+                let question = questionMatch[1].replace(/\\"/g, '"');
+                // If question doesn't end with quote, it might be incomplete - take what we have
+                if (!question.endsWith('"')) {
+                    question = question.replace(/["\s]*$/, '');
+                } else {
+                    question = question.slice(0, -1); // Remove trailing quote
+                }
+                return question.trim();
+            }
+        }
+
+        // Extract question from JSON object pattern (handles incomplete JSON and multiline)
+        // Use a more robust pattern that handles escaped quotes and newlines
+        const questionPattern = /"question"\s*:\s*"((?:[^"\\]|\\.)*?)"/s;
+        const questionMatch = cleaned.match(questionPattern);
+        if (questionMatch && questionMatch[1]) {
+            let extracted = questionMatch[1]
+                .replace(/\\"/g, '"')
+                .replace(/\\n/g, ' ')
+                .replace(/\\t/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+            // Make sure we didn't extract JSON structure
+            if (!extracted.startsWith('[') && !extracted.startsWith('{')) {
+                return extracted;
+            }
+        }
+
+        // Try pattern for incomplete question (no closing quote) - but only if it doesn't look like JSON
+        const incompleteQuestionMatch = cleaned.match(/"question"\s*:\s*"([^"]+)/);
+        if (incompleteQuestionMatch && incompleteQuestionMatch[1]) {
+            let extracted = incompleteQuestionMatch[1]
+                .replace(/\\"/g, '"')
+                .replace(/\\n/g, ' ')
+                .replace(/\\t/g, ' ')
+                .trim();
+            // Remove any trailing JSON structure
+            extracted = extracted.replace(/["\s,}].*$/, '').trim();
+            if (extracted && !extracted.startsWith('[') && !extracted.startsWith('{')) {
+                return extracted;
+            }
+        }
+
+        // Remove JSON structure markers if present
+        cleaned = cleaned.replace(/\{\s*"question"\s*:\s*"/, '');
+        cleaned = cleaned.replace(/"\s*[,}].*$/, '');
+        cleaned = cleaned.replace(/\[\s*\{/, '');
+        cleaned = cleaned.replace(/\}\s*\]/, '');
+
+        // Remove numbering (1., 2., etc.)
+        cleaned = cleaned.replace(/^\d+\.\s*/, '');
+
+        // Remove "Question X:" patterns
+        cleaned = cleaned.replace(/^Question\s*\d*:?\s*/i, '');
+
+        // Trim and clean up
+        cleaned = cleaned.trim();
+
+        // Remove quotes if the entire text is quoted
+        if ((cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+            (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+            cleaned = cleaned.slice(1, -1);
+        }
+
+        cleaned = cleaned.trim();
+
+        // Final validation - if it still looks like JSON structure, try to extract question from it
+        if (cleaned.startsWith('[') || cleaned.startsWith('{')) {
+            // Try one more time to extract question from JSON
+            const lastAttempt = cleaned.match(/"question"\s*:\s*"([^"]+)"/);
+            if (lastAttempt && lastAttempt[1]) {
+                return lastAttempt[1].trim();
+            }
+            // If we can't extract, return empty (will be filtered out)
+            return '';
+        }
+
+        // Remove any remaining intro text patterns
+        cleaned = cleaned.replace(/^Here are \d+.*?questions?.*?:?\s*/i, '');
+        cleaned = cleaned.replace(/^.*?highly specific.*?questions?.*?:?\s*/i, '');
+
+        return cleaned.trim();
+    }
+
     // Parse AI response
     private parseAIResponse(content: string, request: QuestionGenerationRequest): GeneratedQuestion[] {
+        // Clean content first - remove markdown code blocks
+        let cleanedContent = content;
+        cleanedContent = cleanedContent.replace(/```json\s*/gi, '').replace(/```\s*/g, '').replace(/```/g, '');
+
+        // Remove leading descriptive text before JSON
+        cleanedContent = cleanedContent.replace(/^[^[]*?(\[)/, '$1');
+
+        // Try to extract JSON array from the content (handles incomplete arrays too)
+        const jsonArrayMatch = cleanedContent.match(/\[\s*\{[\s\S]*/);
+        if (jsonArrayMatch) {
+            let jsonStr = jsonArrayMatch[0];
+
+            // First, try to extract all question objects using regex (works even with incomplete JSON)
+            const questionObjects: any[] = [];
+
+            // Match complete question objects: "question": "text" (handles multiline and escaped quotes)
+            // This regex matches the question field value, handling escaped quotes and newlines
+            const questionRegex = /"question"\s*:\s*"((?:[^"\\]|\\.|\\n|\\t)*?)"/gs;
+            let match;
+
+            while ((match = questionRegex.exec(jsonStr)) !== null) {
+                try {
+                    let questionText = match[1]
+                        .replace(/\\"/g, '"')
+                        .replace(/\\n/g, ' ')
+                        .replace(/\\t/g, ' ')
+                        .replace(/\\r/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+
+                    // Remove any remaining JSON structure that might be in the question text
+                    questionText = questionText.replace(/^\[.*?\]/, '').trim();
+                    questionText = questionText.replace(/^\{.*?"question".*?\}/, '').trim();
+
+                    // Remove intro text if somehow still present
+                    questionText = questionText.replace(/^Here are \d+.*?questions?.*?:?\s*/i, '');
+                    questionText = questionText.replace(/^.*?highly specific.*?questions?.*?:?\s*/i, '');
+
+                    if (questionText && questionText.length > 10 && !questionText.startsWith('[') && !questionText.startsWith('{')) {
+                        questionObjects.push({ question: questionText });
+                    }
+                } catch (e) {
+                    // Skip invalid matches
+                }
+            }
+
+            // If no complete matches, try to extract incomplete questions (missing closing quote)
+            if (questionObjects.length === 0) {
+                const incompleteRegex = /"question"\s*:\s*"([^"]+)/g;
+                let incompleteMatch;
+                while ((incompleteMatch = incompleteRegex.exec(jsonStr)) !== null) {
+                    const questionText = incompleteMatch[1]
+                        .replace(/\\"/g, '"')
+                        .replace(/\\n/g, ' ')
+                        .replace(/\\t/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    // Remove trailing JSON structure if present
+                    const cleanText = questionText.replace(/["\s,}].*$/, '').trim();
+                    if (cleanText && cleanText.length > 10) {
+                        questionObjects.push({ question: cleanText });
+                    }
+                }
+            }
+
+            // If we found question objects, use them
+            if (questionObjects.length > 0) {
+                return questionObjects.slice(0, request.numberOfQuestions)
+                    .map((q: any, index: number) => {
+                        // Final cleanup pass
+                        let questionText = this.cleanQuestionText(q.question);
+                        return {
+                            id: (Date.now() + index).toString(),
+                            question: questionText,
+                            category: request.categories[0] || 'technical',
+                            type: 'open-ended',
+                            difficulty: request.experienceLevel,
+                            context: request.customContext,
+                            followUpQuestions: [],
+                            expectedKeywords: []
+                        };
+                    })
+                    .filter(q => q.question && q.question.length > 10 && !q.question.startsWith('[') && !q.question.startsWith('{') && !q.question.includes('"question"'));
+            }
+
+            // Try to parse as complete JSON array
+            try {
+                // Try to complete the JSON by finding the end
+                let completeJson = jsonStr;
+                // Count open brackets and try to close them
+                const openBraces = (completeJson.match(/\{/g) || []).length;
+                const closeBraces = (completeJson.match(/\}/g) || []).length;
+                const openBrackets = (completeJson.match(/\[/g) || []).length;
+                const closeBrackets = (completeJson.match(/\]/g) || []).length;
+
+                // Add missing closing brackets
+                if (openBraces > closeBraces) {
+                    completeJson += '}'.repeat(openBraces - closeBraces);
+                }
+                if (openBrackets > closeBrackets) {
+                    completeJson += ']'.repeat(openBrackets - closeBrackets);
+                }
+
+                const questions = JSON.parse(completeJson);
+                if (Array.isArray(questions)) {
+                    return questions.map((q: any, index: number) => {
+                        let questionText = (q.question || q.text || '').trim();
+
+                        // Final cleanup - ensure no JSON structure remains
+                        questionText = this.cleanQuestionText(questionText);
+
+                        return {
+                            id: (Date.now() + index).toString(),
+                            question: questionText,
+                            category: q.category || request.categories[0] || 'technical',
+                            type: q.type || 'open-ended',
+                            difficulty: q.difficulty || request.experienceLevel,
+                            context: request.customContext,
+                            followUpQuestions: q.followUpQuestions || [],
+                            expectedKeywords: q.expectedKeywords || []
+                        };
+                    }).filter(q => q.question && q.question.length > 10 && !q.question.startsWith('[') && !q.question.startsWith('{') && !q.question.includes('"question"')); // Filter out invalid questions
+                }
+            } catch (e) {
+                console.log('Failed to parse JSON array, trying text extraction...');
+            }
+        }
+
+        // Try to parse entire content as direct JSON
         try {
-            // First try to parse as JSON
-            const questions = JSON.parse(content);
-            return questions.map((q: any, index: number) => ({
-                id: (Date.now() + index).toString(),
-                question: q.question,
-                category: q.category,
-                type: q.type,
-                difficulty: q.difficulty,
-                context: request.customContext,
-                followUpQuestions: q.followUpQuestions || [],
-                expectedKeywords: q.expectedKeywords || []
-            }));
+            const questions = JSON.parse(cleanedContent);
+            if (Array.isArray(questions)) {
+                return questions.map((q: any, index: number) => {
+                    let questionText = (q.question || q.text || '').trim();
+                    questionText = this.cleanQuestionText(questionText);
+
+                    return {
+                        id: (Date.now() + index).toString(),
+                        question: questionText,
+                        category: q.category || request.categories[0] || 'technical',
+                        type: q.type || 'open-ended',
+                        difficulty: q.difficulty || request.experienceLevel,
+                        context: request.customContext,
+                        followUpQuestions: q.followUpQuestions || [],
+                        expectedKeywords: q.expectedKeywords || []
+                    };
+                }).filter(q => q.question && q.question.length > 10 && !q.question.startsWith('[') && !q.question.startsWith('{') && !q.question.includes('"question"'));
+            }
+
+            // If it's a single object
+            if (questions && questions.question) {
+                let questionText = questions.question.trim();
+                questionText = this.cleanQuestionText(questionText);
+
+                return [{
+                    id: Date.now().toString(),
+                    question: questionText,
+                    category: questions.category || request.categories[0] || 'technical',
+                    type: questions.type || 'open-ended',
+                    difficulty: questions.difficulty || request.experienceLevel,
+                    context: request.customContext,
+                    followUpQuestions: questions.followUpQuestions || [],
+                    expectedKeywords: questions.expectedKeywords || []
+                }];
+            }
         } catch (error) {
             // If JSON parsing fails, try to extract questions from text response
             console.log('JSON parsing failed, trying text extraction...');
-            return this.extractQuestionsFromText(content, request);
         }
+
+        // Fallback to text extraction
+        return this.extractQuestionsFromText(content, request);
     }
 
     private extractQuestionsFromText(content: string, request: QuestionGenerationRequest): GeneratedQuestion[] {
@@ -649,16 +935,19 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
         // Create question objects
         extractedTexts.forEach((text, index) => {
             if (text.trim().length > 10) {
-                questions.push({
-                    id: (Date.now() + index).toString(),
-                    question: text.trim().replace(/^\d+\.\s*/, ''), // Remove numbering
-                    category: request.categories[0] || 'technical',
-                    type: 'open-ended',
-                    difficulty: request.experienceLevel,
-                    context: request.customContext,
-                    followUpQuestions: [],
-                    expectedKeywords: []
-                });
+                const cleanedQuestion = this.cleanQuestionText(text);
+                if (cleanedQuestion && cleanedQuestion.length > 10) {
+                    questions.push({
+                        id: (Date.now() + index).toString(),
+                        question: cleanedQuestion,
+                        category: request.categories[0] || 'technical',
+                        type: 'open-ended',
+                        difficulty: request.experienceLevel,
+                        context: request.customContext,
+                        followUpQuestions: [],
+                        expectedKeywords: []
+                    });
+                }
             }
         });
 
@@ -785,12 +1074,14 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
     }
 
     // Store generated questions
-    private async storeGeneratedQuestions(sessionId: string, questions: GeneratedQuestion[]): Promise<void> {
+    private async storeGeneratedQuestions(sessionId: string, questions: GeneratedQuestion[]): Promise<GeneratedQuestion[]> {
+        const storedQuestions: GeneratedQuestion[] = [];
         for (let i = 0; i < questions.length; i++) {
             const q = questions[i];
-            await query(
+            const result = await query(
                 `INSERT INTO generated_questions (session_id, question, category, type, difficulty, context, follow_up_questions, expected_keywords, order_index)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                 RETURNING id`,
                 [
                     sessionId,
                     q.question,
@@ -803,7 +1094,13 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
                     i
                 ]
             );
+            // Return question with database ID
+            storedQuestions.push({
+                ...q,
+                id: result.rows[0].id
+            });
         }
+        return storedQuestions;
     }
 
     // Generate unique session ID

@@ -3,7 +3,7 @@ import axios, { AxiosResponse } from 'axios';
 import { User, LoginData, RegisterData, AuthResponse } from '../types';
 
 // Configure axios base URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3500';
 axios.defaults.baseURL = API_BASE_URL;
 
 interface AuthContextType {
