@@ -1,8 +1,8 @@
 {
   "name": "FastAPI Dev",
   "dockerComposeFile": "./docker-compose.yml",
-  "service": "fastapi-dev",
-  "workspaceFolder": "/cv-parser",
+  "service": "cv-parser-backend-dev",
+  "workspaceFolder": "/cv-parser-backend",
   "forwardPorts": [
     8000,
     5678
@@ -11,12 +11,20 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "ms-python.python"
+        "ms-python.python",
+        "charliermarsh.ruff"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
         "python.linting.pylintEnabled": true,
-        "python.linting.enabled": true
+        "python.linting.enabled": true,
+        "[python]": {
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+          }
+        }
       }
     }
   }

@@ -1,0 +1,10 @@
+services:
+  cv-parser-frontend-dev:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    container_name: cv-parser-frontend-dev
+    volumes:
+      - ..:/cv-parser-frontend
+    ports:
+      - "3000:3000"

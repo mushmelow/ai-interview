@@ -1,24 +1,24 @@
 services:
-  fastapi-dev:
+  cv-parser-backend-dev:
     build: 
       context: ..
       dockerfile: .devcontainer/Dockerfile
       target: development
-    container_name: fastapi-development
+    container_name: cv-parser-backend-development
     ports:
       - "8000:8000"
       - "5678:5678"
     models:
       - llm
     volumes:
-      - ..:/cv-parser
+      - ..:/cv-parser-backend
 
-  # fastapi-prod:
+  # cv-parser-backend-production:
   #   build:
   #     context: ..
   #     dockerfile: .devcontainer/Dockerfile
   #     target: production
-  #   container_name: fastapi-production
+  #   container_name: cv-parser-backend-production
   #   ports:
   #     - "80:8000"
   #   models:

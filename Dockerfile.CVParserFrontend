@@ -1,0 +1,15 @@
+FROM mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm
+
+WORKDIR /cv-parser-frontend
+
+COPY ./cv-parser-frontend/package*.json ./
+
+RUN npm install
+
+COPY ./cv-parser-frontend .
+
+RUN npm run build
+
+EXPOSE 3000
+
+ENTRYPOINT [ "npm", "start" ]

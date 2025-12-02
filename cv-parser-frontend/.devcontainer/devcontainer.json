@@ -1,0 +1,21 @@
+{
+	"name": "Next.js Frontend Dev Container",
+	"dockerComposeFile": "./docker-compose.yml",
+	"service": "cv-parser-frontend-dev",
+	"workspaceFolder": "/cv-parser-frontend",
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	"forwardPorts": [3000],
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+	"postCreateCommand": "npm install",
+
+	// Configure tool-specific properties.
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"terminal.integrated.shell.linux": "/bin/bash"
+			}
+		}
+	}
+}

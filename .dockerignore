@@ -1,0 +1,50 @@
+# Git
+.git
+.gitignore
+
+# Docker
+.dockerignore
+Dockerfile*
+docker-compose*
+
+# IDEs and Editors
+.vscode
+.idea
+*.swp
+*.swo
+
+# Dev Container
+.devcontainer
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Node.js / Next.js / Frontend
+node_modules
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+.next
+out
+build
+coverage
+.nyc_output
+
+# Python / FastAPI / Backend
+__pycache__
+*.py[cod]
+*$py.class
+.venv
+venv
+env
+ENV
+.pytest_cache
+.mypy_cache
+.tox
+htmlcov
+.coverage
+pip-log.txt
+
+# TypeScript
+*.tsbuildinfo

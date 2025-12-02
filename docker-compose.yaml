@@ -1,0 +1,25 @@
+services:
+  cv-parser-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.CVParserBackend
+      target: development
+    container_name: cv-parser-backend
+    ports:
+      - "8000:8000"
+    models:
+      - llm
+
+  cv-parser-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.CVParserFrontend
+    container_name: cv-parser-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - cv-parser-backend
+
+models:
+  llm:
+    model: ai/gpt-oss:20B-UD-Q4_K_XL
