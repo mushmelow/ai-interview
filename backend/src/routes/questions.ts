@@ -1,12 +1,12 @@
 import express from 'express';
 import QuestionController from '../controllers/QuestionController';
-import { authenticateToken } from '../middleware/auth';
+import { optionalAuth } from '../middleware/auth';
 
 const router = express.Router();
 const questionController = new QuestionController();
 
-// All routes require authentication
-router.use(authenticateToken);
+// Authentication is optional (login disabled)
+router.use(optionalAuth);
 
 // Generate AI questions
 router.post('/generate', questionController.generateQuestions);

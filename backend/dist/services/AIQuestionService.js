@@ -12,10 +12,10 @@ class AIQuestionService {
             const sessionId = this.generateSessionId();
             await this.createQuestionSession(request, sessionId);
             const questions = await this.generateQuestionsWithAI(request);
-            await this.storeGeneratedQuestions(sessionId, questions);
+            const storedQuestions = await this.storeGeneratedQuestions(sessionId, questions);
             return {
                 success: true,
-                questions,
+                questions: storedQuestions,
                 sessionId,
                 metadata: {
                     position: request.position,
@@ -511,24 +511,230 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
         };
         return categories.map(cat => `- ${cat}: ${categoryDescriptions[cat] || 'General assessment of this area'}`).join('\n');
     }
+    cleanQuestionText(text) {
+        if (!text)
+            return text;
+        let cleaned = text;
+        cleaned = cleaned.replace(/```json\s*/gi, '').replace(/```\s*/g, '').replace(/```/g, '');
+        cleaned = cleaned.replace(/^Here are \d+.*?questions?.*?:?\s*/i, '');
+        cleaned = cleaned.replace(/^Here are.*?interview questions?.*?:?\s*/i, '');
+        cleaned = cleaned.replace(/^The following.*?questions?.*?:?\s*/i, '');
+        cleaned = cleaned.replace(/^.*?highly specific.*?questions?.*?:?\s*/i, '');
+        cleaned = cleaned.replace(/^.*?for a.*?position.*?:?\s*/i, '');
+        const jsonArrayMatch = cleaned.match(/\[\s*\{[\s\S]*?\}\s*\]/);
+        if (jsonArrayMatch) {
+            try {
+                const jsonData = JSON.parse(jsonArrayMatch[0]);
+                if (Array.isArray(jsonData) && jsonData.length > 0 && jsonData[0].question) {
+                    return jsonData[0].question.trim();
+                }
+            }
+            catch (e) {
+            }
+        }
+        cleaned = cleaned.replace(/\[\s*\{[\s\S]*?\}\s*\]/g, '');
+        const jsonObjectMatch = cleaned.match(/\{\s*"question"\s*:\s*"([^"]+)"[\s\S]*?\}/);
+        if (jsonObjectMatch && jsonObjectMatch[1]) {
+            return jsonObjectMatch[1].trim();
+        }
+        cleaned = cleaned.replace(/\{\s*"question"\s*:\s*"([^"]+)"[\s\S]*?\}/g, '$1');
+        const incompleteArrayMatch = cleaned.match(/\[\s*\{[\s\S]*/);
+        if (incompleteArrayMatch) {
+            const jsonStr = incompleteArrayMatch[0];
+            const questionMatch = jsonStr.match(/"question"\s*:\s*"([^"]*(?:"[^"]*")*[^"]*)/);
+            if (questionMatch && questionMatch[1]) {
+                let question = questionMatch[1].replace(/\\"/g, '"');
+                if (!question.endsWith('"')) {
+                    question = question.replace(/["\s]*$/, '');
+                }
+                else {
+                    question = question.slice(0, -1);
+                }
+                return question.trim();
+            }
+        }
+        const questionPattern = /"question"\s*:\s*"((?:[^"\\]|\\.)*?)"/s;
+        const questionMatch = cleaned.match(questionPattern);
+        if (questionMatch && questionMatch[1]) {
+            let extracted = questionMatch[1]
+                .replace(/\\"/g, '"')
+                .replace(/\\n/g, ' ')
+                .replace(/\\t/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+            if (!extracted.startsWith('[') && !extracted.startsWith('{')) {
+                return extracted;
+            }
+        }
+        const incompleteQuestionMatch = cleaned.match(/"question"\s*:\s*"([^"]+)/);
+        if (incompleteQuestionMatch && incompleteQuestionMatch[1]) {
+            let extracted = incompleteQuestionMatch[1]
+                .replace(/\\"/g, '"')
+                .replace(/\\n/g, ' ')
+                .replace(/\\t/g, ' ')
+                .trim();
+            extracted = extracted.replace(/["\s,}].*$/, '').trim();
+            if (extracted && !extracted.startsWith('[') && !extracted.startsWith('{')) {
+                return extracted;
+            }
+        }
+        cleaned = cleaned.replace(/\{\s*"question"\s*:\s*"/, '');
+        cleaned = cleaned.replace(/"\s*[,}].*$/, '');
+        cleaned = cleaned.replace(/\[\s*\{/, '');
+        cleaned = cleaned.replace(/\}\s*\]/, '');
+        cleaned = cleaned.replace(/^\d+\.\s*/, '');
+        cleaned = cleaned.replace(/^Question\s*\d*:?\s*/i, '');
+        cleaned = cleaned.trim();
+        if ((cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+            (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+            cleaned = cleaned.slice(1, -1);
+        }
+        cleaned = cleaned.trim();
+        if (cleaned.startsWith('[') || cleaned.startsWith('{')) {
+            const lastAttempt = cleaned.match(/"question"\s*:\s*"([^"]+)"/);
+            if (lastAttempt && lastAttempt[1]) {
+                return lastAttempt[1].trim();
+            }
+            return '';
+        }
+        cleaned = cleaned.replace(/^Here are \d+.*?questions?.*?:?\s*/i, '');
+        cleaned = cleaned.replace(/^.*?highly specific.*?questions?.*?:?\s*/i, '');
+        return cleaned.trim();
+    }
     parseAIResponse(content, request) {
+        let cleanedContent = content;
+        cleanedContent = cleanedContent.replace(/```json\s*/gi, '').replace(/```\s*/g, '').replace(/```/g, '');
+        cleanedContent = cleanedContent.replace(/^[^[]*?(\[)/, '$1');
+        const jsonArrayMatch = cleanedContent.match(/\[\s*\{[\s\S]*/);
+        if (jsonArrayMatch) {
+            let jsonStr = jsonArrayMatch[0];
+            const questionObjects = [];
+            const questionRegex = /"question"\s*:\s*"((?:[^"\\]|\\.|\\n|\\t)*?)"/gs;
+            let match;
+            while ((match = questionRegex.exec(jsonStr)) !== null) {
+                try {
+                    let questionText = match[1]
+                        .replace(/\\"/g, '"')
+                        .replace(/\\n/g, ' ')
+                        .replace(/\\t/g, ' ')
+                        .replace(/\\r/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    questionText = questionText.replace(/^\[.*?\]/, '').trim();
+                    questionText = questionText.replace(/^\{.*?"question".*?\}/, '').trim();
+                    questionText = questionText.replace(/^Here are \d+.*?questions?.*?:?\s*/i, '');
+                    questionText = questionText.replace(/^.*?highly specific.*?questions?.*?:?\s*/i, '');
+                    if (questionText && questionText.length > 10 && !questionText.startsWith('[') && !questionText.startsWith('{')) {
+                        questionObjects.push({ question: questionText });
+                    }
+                }
+                catch (e) {
+                }
+            }
+            if (questionObjects.length === 0) {
+                const incompleteRegex = /"question"\s*:\s*"([^"]+)/g;
+                let incompleteMatch;
+                while ((incompleteMatch = incompleteRegex.exec(jsonStr)) !== null) {
+                    const questionText = incompleteMatch[1]
+                        .replace(/\\"/g, '"')
+                        .replace(/\\n/g, ' ')
+                        .replace(/\\t/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    const cleanText = questionText.replace(/["\s,}].*$/, '').trim();
+                    if (cleanText && cleanText.length > 10) {
+                        questionObjects.push({ question: cleanText });
+                    }
+                }
+            }
+            if (questionObjects.length > 0) {
+                return questionObjects.slice(0, request.numberOfQuestions)
+                    .map((q, index) => {
+                    let questionText = this.cleanQuestionText(q.question);
+                    return {
+                        id: (Date.now() + index).toString(),
+                        question: questionText,
+                        category: request.categories[0] || 'technical',
+                        type: 'open-ended',
+                        difficulty: request.experienceLevel,
+                        context: request.customContext,
+                        followUpQuestions: [],
+                        expectedKeywords: []
+                    };
+                })
+                    .filter(q => q.question && q.question.length > 10 && !q.question.startsWith('[') && !q.question.startsWith('{') && !q.question.includes('"question"'));
+            }
+            try {
+                let completeJson = jsonStr;
+                const openBraces = (completeJson.match(/\{/g) || []).length;
+                const closeBraces = (completeJson.match(/\}/g) || []).length;
+                const openBrackets = (completeJson.match(/\[/g) || []).length;
+                const closeBrackets = (completeJson.match(/\]/g) || []).length;
+                if (openBraces > closeBraces) {
+                    completeJson += '}'.repeat(openBraces - closeBraces);
+                }
+                if (openBrackets > closeBrackets) {
+                    completeJson += ']'.repeat(openBrackets - closeBrackets);
+                }
+                const questions = JSON.parse(completeJson);
+                if (Array.isArray(questions)) {
+                    return questions.map((q, index) => {
+                        let questionText = (q.question || q.text || '').trim();
+                        questionText = this.cleanQuestionText(questionText);
+                        return {
+                            id: (Date.now() + index).toString(),
+                            question: questionText,
+                            category: q.category || request.categories[0] || 'technical',
+                            type: q.type || 'open-ended',
+                            difficulty: q.difficulty || request.experienceLevel,
+                            context: request.customContext,
+                            followUpQuestions: q.followUpQuestions || [],
+                            expectedKeywords: q.expectedKeywords || []
+                        };
+                    }).filter(q => q.question && q.question.length > 10 && !q.question.startsWith('[') && !q.question.startsWith('{') && !q.question.includes('"question"'));
+                }
+            }
+            catch (e) {
+                console.log('Failed to parse JSON array, trying text extraction...');
+            }
+        }
         try {
-            const questions = JSON.parse(content);
-            return questions.map((q, index) => ({
-                id: (Date.now() + index).toString(),
-                question: q.question,
-                category: q.category,
-                type: q.type,
-                difficulty: q.difficulty,
-                context: request.customContext,
-                followUpQuestions: q.followUpQuestions || [],
-                expectedKeywords: q.expectedKeywords || []
-            }));
+            const questions = JSON.parse(cleanedContent);
+            if (Array.isArray(questions)) {
+                return questions.map((q, index) => {
+                    let questionText = (q.question || q.text || '').trim();
+                    questionText = this.cleanQuestionText(questionText);
+                    return {
+                        id: (Date.now() + index).toString(),
+                        question: questionText,
+                        category: q.category || request.categories[0] || 'technical',
+                        type: q.type || 'open-ended',
+                        difficulty: q.difficulty || request.experienceLevel,
+                        context: request.customContext,
+                        followUpQuestions: q.followUpQuestions || [],
+                        expectedKeywords: q.expectedKeywords || []
+                    };
+                }).filter(q => q.question && q.question.length > 10 && !q.question.startsWith('[') && !q.question.startsWith('{') && !q.question.includes('"question"'));
+            }
+            if (questions && questions.question) {
+                let questionText = questions.question.trim();
+                questionText = this.cleanQuestionText(questionText);
+                return [{
+                        id: Date.now().toString(),
+                        question: questionText,
+                        category: questions.category || request.categories[0] || 'technical',
+                        type: questions.type || 'open-ended',
+                        difficulty: questions.difficulty || request.experienceLevel,
+                        context: request.customContext,
+                        followUpQuestions: questions.followUpQuestions || [],
+                        expectedKeywords: questions.expectedKeywords || []
+                    }];
+            }
         }
         catch (error) {
             console.log('JSON parsing failed, trying text extraction...');
-            return this.extractQuestionsFromText(content, request);
         }
+        return this.extractQuestionsFromText(content, request);
     }
     extractQuestionsFromText(content, request) {
         const questions = [];
@@ -552,16 +758,19 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
         }
         extractedTexts.forEach((text, index) => {
             if (text.trim().length > 10) {
-                questions.push({
-                    id: (Date.now() + index).toString(),
-                    question: text.trim().replace(/^\d+\.\s*/, ''),
-                    category: request.categories[0] || 'technical',
-                    type: 'open-ended',
-                    difficulty: request.experienceLevel,
-                    context: request.customContext,
-                    followUpQuestions: [],
-                    expectedKeywords: []
-                });
+                const cleanedQuestion = this.cleanQuestionText(text);
+                if (cleanedQuestion && cleanedQuestion.length > 10) {
+                    questions.push({
+                        id: (Date.now() + index).toString(),
+                        question: cleanedQuestion,
+                        category: request.categories[0] || 'technical',
+                        type: 'open-ended',
+                        difficulty: request.experienceLevel,
+                        context: request.customContext,
+                        followUpQuestions: [],
+                        expectedKeywords: []
+                    });
+                }
             }
         });
         if (questions.length === 0) {
@@ -657,10 +866,12 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
         ]);
     }
     async storeGeneratedQuestions(sessionId, questions) {
+        const storedQuestions = [];
         for (let i = 0; i < questions.length; i++) {
             const q = questions[i];
-            await query(`INSERT INTO generated_questions (session_id, question, category, type, difficulty, context, follow_up_questions, expected_keywords, order_index)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`, [
+            const result = await query(`INSERT INTO generated_questions (session_id, question, category, type, difficulty, context, follow_up_questions, expected_keywords, order_index)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                 RETURNING id`, [
                 sessionId,
                 q.question,
                 q.category,
@@ -671,7 +882,12 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
                 JSON.stringify(q.expectedKeywords),
                 i
             ]);
+            storedQuestions.push({
+                ...q,
+                id: result.rows[0].id
+            });
         }
+        return storedQuestions;
     }
     generateSessionId() {
         return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

@@ -1,12 +1,12 @@
 import express from 'express';
 import AnswerController from '../controllers/AnswerController';
-import { authenticateToken } from '../middleware/auth';
+import { optionalAuth } from '../middleware/auth';
 
 const router = express.Router();
 const answerController = new AnswerController();
 
-// All routes require authentication
-router.use(authenticateToken);
+// Authentication is optional (login disabled)
+router.use(optionalAuth);
 
 // Submit an answer for a question
 router.post('/submit', answerController.submitAnswer);

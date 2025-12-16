@@ -91,7 +91,16 @@ const QuestionGenerator: React.FC<QuestionGeneratorProps> = ({ onQuestionsGenera
             const response = await questionService.generateQuestions(request);
 
             if (response.success && response.data) {
-                onQuestionsGenerated(response.data.questions, response.data.sessionId);
+                // response.data is already QuestionSession type
+                const questionSession = response.data;
+                const questions = questionSession.questions || [];
+                const sessionId = questionSession.sessionId;
+                
+                if (questions.length > 0 && sessionId) {
+                    onQuestionsGenerated(questions, sessionId);
+                } else {
+                    setError('No questions generated or missing session ID');
+                }
             } else {
                 setError(response.message || 'Failed to generate questions');
             }

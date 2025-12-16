@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 const { query } = require('../database/connection');
+import answerScoringService from '../services/AnswerScoringService';
 
 interface SubmitAnswerRequest {
     questionId: number;
@@ -13,14 +14,8 @@ class AnswerController {
     // Submit an answer for a question
     submitAnswer = async (req: Request, res: Response): Promise<void> => {
         try {
-            const userId = (req as any).user?.userId;
-            if (!userId) {
-                res.status(401).json({
-                    success: false,
-                    message: 'User not authenticated'
-                });
-                return;
-            }
+            // Use default user ID if not authenticated (login disabled)
+            const userId = (req as any).user?.userId || 1; // Default to user ID 1
 
             const { questionId, sessionId, answer, answerType = 'text', recordingPath }: SubmitAnswerRequest = req.body;
 
@@ -32,9 +27,9 @@ class AnswerController {
                 return;
             }
 
-            // Verify the question exists and belongs to the session
+            // Verify the question exists and belongs to the session, get question details
             const questionCheck = await query(
-                'SELECT id FROM generated_questions WHERE id = $1 AND session_id = $2',
+                'SELECT id, question, expected_keywords, category, difficulty FROM generated_questions WHERE id = $1 AND session_id = $2',
                 [questionId, sessionId]
             );
 
@@ -46,6 +41,42 @@ class AnswerController {
                 return;
             }
 
+            const questionData = questionCheck.rows[0];
+
+            // Score the answer using AI
+            let scoreResult;
+            try {
+                console.log('🎯 Starting AI scoring for answer...');
+                scoreResult = await answerScoringService.scoreAnswer(
+                    questionData.question,
+                    answer,
+                    questionData.expected_keywords || [],
+                    questionData.category,
+                    questionData.difficulty
+                );
+                console.log(`✅ Answer scored successfully: ${scoreResult.score}/10`);
+                console.log(`   Feedback length: ${scoreResult.feedback.length} chars`);
+                console.log(`   Reasoning: ${scoreResult.reasoning?.substring(0, 100)}`);
+            } catch (error) {
+                console.error('❌ CRITICAL ERROR: AI scoring failed!', error);
+                console.error('Error details:', error instanceof Error ? error.message : String(error));
+                console.error('Stack:', error instanceof Error ? error.stack : 'No stack');
+                
+                // Return a clear error indicator instead of silent 5.0
+                // This will help identify when AI scoring is not working
+                scoreResult = {
+                    score: 5.0,
+                    feedback: `⚠️ AI scoring service encountered an error. Your answer has been saved, but automatic scoring is unavailable. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please check that Ollama is running and accessible.`,
+                    reasoning: 'AI scoring failed - check backend logs for details',
+                    strengths: ['Answer was submitted successfully'],
+                    improvements: ['AI scoring unavailable - manual review recommended'],
+                    suggestions: ['Ensure Ollama is running: ollama serve', 'Check backend logs for detailed error information']
+                };
+                
+                // Log this as a warning so it's visible
+                console.warn('⚠️ Using fallback score due to AI scoring failure');
+            }
+
             // Check if answer already exists (update if it does)
             const existingAnswer = await query(
                 'SELECT id FROM question_answers WHERE question_id = $1 AND user_id = $2',
@@ -54,29 +85,65 @@ class AnswerController {
 
             let result;
             if (existingAnswer.rows.length > 0) {
-                // Update existing answer
+                // Update existing answer with score and detailed feedback
                 result = await query(
                     `UPDATE question_answers 
-                     SET answer = $1, answer_type = $2, recording_path = $3, updated_at = NOW()
-                     WHERE question_id = $4 AND user_id = $5
+                     SET answer = $1, answer_type = $2, recording_path = $3, 
+                         score = $4, score_feedback = $5, 
+                         strengths = $6, improvements = $7, suggestions = $8,
+                         scored_at = NOW(), updated_at = NOW()
+                     WHERE question_id = $9 AND user_id = $10
                      RETURNING *`,
-                    [answer, answerType, recordingPath || null, questionId, userId]
+                    [
+                        answer, 
+                        answerType, 
+                        recordingPath || null,
+                        scoreResult.score,
+                        scoreResult.feedback,
+                        scoreResult.strengths || [],
+                        scoreResult.improvements || [],
+                        scoreResult.suggestions || [],
+                        questionId, 
+                        userId
+                    ]
                 );
             } else {
-                // Insert new answer
+                // Insert new answer with score and detailed feedback
                 result = await query(
                     `INSERT INTO question_answers 
-                     (question_id, session_id, user_id, answer, answer_type, recording_path)
-                     VALUES ($1, $2, $3, $4, $5, $6)
+                     (question_id, session_id, user_id, answer, answer_type, recording_path, 
+                      score, score_feedback, strengths, improvements, suggestions, scored_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
                      RETURNING *`,
-                    [questionId, sessionId, userId, answer, answerType, recordingPath || null]
+                    [
+                        questionId, 
+                        sessionId, 
+                        userId, 
+                        answer, 
+                        answerType, 
+                        recordingPath || null,
+                        scoreResult.score,
+                        scoreResult.feedback,
+                        scoreResult.strengths || [],
+                        scoreResult.improvements || [],
+                        scoreResult.suggestions || []
+                    ]
                 );
             }
 
+            const answerData = result.rows[0];
             res.json({
                 success: true,
                 message: 'Answer submitted successfully',
-                data: result.rows[0]
+                data: {
+                    ...answerData,
+                    score: scoreResult.score,
+                    scoreFeedback: scoreResult.feedback,
+                    scoreReasoning: scoreResult.reasoning,
+                    strengths: answerData.strengths || scoreResult.strengths || [],
+                    improvements: answerData.improvements || scoreResult.improvements || [],
+                    suggestions: answerData.suggestions || scoreResult.suggestions || []
+                }
             });
         } catch (error) {
             console.error('Error submitting answer:', error);
@@ -91,16 +158,9 @@ class AnswerController {
     // Get all answers for a session
     getSessionAnswers = async (req: Request, res: Response): Promise<void> => {
         try {
-            const userId = (req as any).user?.userId;
+            // Use default user ID if not authenticated (login disabled)
+            const userId = (req as any).user?.userId || 1; // Default to user ID 1
             const { sessionId } = req.params;
-
-            if (!userId) {
-                res.status(401).json({
-                    success: false,
-                    message: 'User not authenticated'
-                });
-                return;
-            }
 
             if (!sessionId) {
                 res.status(400).json({
@@ -137,16 +197,9 @@ class AnswerController {
     // Get answer for a specific question
     getQuestionAnswer = async (req: Request, res: Response): Promise<void> => {
         try {
-            const userId = (req as any).user?.userId;
+            // Use default user ID if not authenticated (login disabled)
+            const userId = (req as any).user?.userId || 1; // Default to user ID 1
             const { questionId } = req.params;
-
-            if (!userId) {
-                res.status(401).json({
-                    success: false,
-                    message: 'User not authenticated'
-                });
-                return;
-            }
 
             const result = await query(
                 `SELECT qa.*, gq.question, gq.category, gq.type, gq.difficulty

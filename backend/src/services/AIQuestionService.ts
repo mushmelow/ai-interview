@@ -98,7 +98,7 @@ class AIQuestionService {
                             stream: false,
                             options: {
                                 temperature: 0.7,
-                                max_tokens: 2000
+                                max_tokens: Math.max(2000, request.numberOfQuestions * 500) // More tokens for more questions
                             }
                         })
                     });
@@ -413,7 +413,9 @@ class AIQuestionService {
         const experienceContext = this.getExperienceLevelContext(request.experienceLevel);
         const categoryContext = this.getCategoryContext(request.categories);
 
-        return `You are an expert technical recruiter and interviewer. Generate ${request.numberOfQuestions} highly specific, role-targeted interview questions for a ${request.experienceLevel} ${request.position} position.
+        return `You are an expert technical recruiter and interviewer. Generate EXACTLY ${request.numberOfQuestions} highly specific, role-targeted interview questions for a ${request.experienceLevel} ${request.position} position.
+
+CRITICAL: You MUST generate ${request.numberOfQuestions} questions. Do not stop at 1 question. Generate all ${request.numberOfQuestions} questions.
 
 ROLE-SPECIFIC CONTEXT:
 ${roleContext}
@@ -434,16 +436,32 @@ REQUIREMENTS FOR EACH QUESTION:
 4. Should cover different aspects: technical skills, problem-solving, communication, experience
 5. Include specific technologies, tools, or methodologies relevant to the role
 
-OUTPUT FORMAT:
-Return a JSON array of objects with these exact keys:
-- "question": The interview question (string)
-- "category": One of: ${request.categories.join(', ')} (string)
-- "type": One of: "technical", "behavioral", "situational", "cultural" (string)
-- "difficulty": "${request.difficulty}" (string)
-- "followUpQuestions": Array of 2-3 follow-up questions (string[])
-- "expectedKeywords": Array of 3-5 keywords a good answer should include (string[])
+OUTPUT FORMAT - YOU MUST RETURN A JSON ARRAY WITH EXACTLY ${request.numberOfQuestions} OBJECTS:
+[
+  {
+    "question": "First interview question here",
+    "category": "${request.categories[0] || 'Technical Skills'}",
+    "type": "technical",
+    "difficulty": "${request.difficulty}",
+    "followUpQuestions": ["follow-up 1", "follow-up 2"],
+    "expectedKeywords": ["keyword1", "keyword2", "keyword3"]
+  },
+  {
+    "question": "Second interview question here",
+    "category": "${request.categories[1] || request.categories[0] || 'Technical Skills'}",
+    "type": "behavioral",
+    "difficulty": "${request.difficulty}",
+    "followUpQuestions": ["follow-up 1", "follow-up 2"],
+    "expectedKeywords": ["keyword1", "keyword2", "keyword3"]
+  }
+  ... continue for all ${request.numberOfQuestions} questions ...
+]
 
-IMPORTANT: Make each question unique, specific to the ${request.position} role, and progressively challenging. Avoid generic questions that could apply to any role.`;
+IMPORTANT: 
+- Return ONLY the JSON array, no other text before or after
+- Generate EXACTLY ${request.numberOfQuestions} questions, not just 1
+- Make each question unique, specific to the ${request.position} role, and progressively challenging
+- Avoid generic questions that could apply to any role`;
     }
 
     // Get role-specific context for question generation
@@ -729,6 +747,10 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
 
     // Parse AI response
     private parseAIResponse(content: string, request: QuestionGenerationRequest): GeneratedQuestion[] {
+        console.log('Parsing AI response, requested questions:', request.numberOfQuestions);
+        console.log('Response length:', content.length);
+        console.log('Response preview:', content.substring(0, 500));
+        
         // Clean content first - remove markdown code blocks
         let cleanedContent = content;
         cleanedContent = cleanedContent.replace(/```json\s*/gi, '').replace(/```\s*/g, '').replace(/```/g, '');
@@ -796,14 +818,15 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
 
             // If we found question objects, use them
             if (questionObjects.length > 0) {
-                return questionObjects.slice(0, request.numberOfQuestions)
+                console.log(`Found ${questionObjects.length} questions via regex extraction`);
+                const questions = questionObjects.slice(0, request.numberOfQuestions)
                     .map((q: any, index: number) => {
                         // Final cleanup pass
                         let questionText = this.cleanQuestionText(q.question);
                         return {
                             id: (Date.now() + index).toString(),
                             question: questionText,
-                            category: request.categories[0] || 'technical',
+                            category: request.categories[index % request.categories.length] || request.categories[0] || 'technical',
                             type: 'open-ended',
                             difficulty: request.experienceLevel,
                             context: request.customContext,
@@ -812,6 +835,15 @@ IMPORTANT: Make each question unique, specific to the ${request.position} role, 
                         };
                     })
                     .filter(q => q.question && q.question.length > 10 && !q.question.startsWith('[') && !q.question.startsWith('{') && !q.question.includes('"question"'));
+                
+                console.log(`Returning ${questions.length} questions after filtering`);
+                
+                // If we got fewer questions than requested, try to generate more
+                if (questions.length < request.numberOfQuestions) {
+                    console.warn(`Only got ${questions.length} questions, requested ${request.numberOfQuestions}`);
+                }
+                
+                return questions;
             }
 
             // Try to parse as complete JSON array

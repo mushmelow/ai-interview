@@ -169,10 +169,8 @@ const Interview: React.FC = () => {
     };
 
     const handleStartInterview = async (): Promise<void> => {
-        if (!user) {
-            setError('Please log in to start an interview');
-            return;
-        }
+        // Use default user ID if not available (login disabled)
+        const userId = user?.id || 1;
 
         try {
             setLoading(true);
@@ -180,7 +178,7 @@ const Interview: React.FC = () => {
 
             // Start interview session on backend
             const interviewData = await interviewService.startInterview(
-                user.id,
+                userId,
                 'AI Interview Session',
                 'Automated interview with AI analysis'
             );

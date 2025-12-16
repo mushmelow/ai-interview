@@ -24,6 +24,12 @@ export interface Answer {
     category?: string;
     type?: string;
     difficulty?: string;
+    score?: number; // AI score from 0-10
+    scoreFeedback?: string; // AI feedback on the answer
+    scoreReasoning?: string; // Reasoning for the score
+    strengths?: string[]; // What was done well
+    improvements?: string[]; // Areas for improvement
+    suggestions?: string[]; // Specific suggestions
 }
 
 class AnswerService {

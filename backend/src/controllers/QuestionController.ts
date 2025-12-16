@@ -12,14 +12,8 @@ class QuestionController {
     // Generate AI questions
     generateQuestions = async (req: Request, res: Response): Promise<void> => {
         try {
-            const userId = (req as any).user?.userId;
-            if (!userId) {
-                res.status(401).json({
-                    success: false,
-                    message: 'User not authenticated'
-                });
-                return;
-            }
+            // Use default user ID if not authenticated (login disabled)
+            const userId = (req as any).user?.userId || 1; // Default to user ID 1
 
             const {
                 position,

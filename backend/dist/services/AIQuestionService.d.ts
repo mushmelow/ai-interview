@@ -22,6 +22,7 @@ declare class AIQuestionService {
     private getRoleSpecificContext;
     private getExperienceLevelContext;
     private getCategoryContext;
+    private cleanQuestionText;
     private parseAIResponse;
     private extractQuestionsFromText;
     private getRelevantTemplates;

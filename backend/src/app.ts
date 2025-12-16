@@ -29,7 +29,7 @@ const logger: Logger = {
 };
 
 const app = express();
-const PORT: number = parseInt(process.env.PORT || '4000', 10);
+const PORT: number = parseInt(process.env.PORT || '3500', 10);
 
 // Middleware
 app.use(cors({

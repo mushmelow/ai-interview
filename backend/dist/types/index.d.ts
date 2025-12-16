@@ -61,6 +61,7 @@ export interface ConsentResponse {
     consentGiven: boolean;
     consentDate: string | null;
     consentVersion: string;
+    consents?: ConsentData | null;
 }
 export interface Interview {
     id: number;

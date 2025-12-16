@@ -32,8 +32,17 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState<boolean>(true);
+    // Default user when login is disabled
+    const defaultUser: User = {
+        id: 1,
+        email: 'guest@example.com',
+        role: 'candidate',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    };
+    
+    const [user, setUser] = useState<User | null>(defaultUser);
+    const [loading, setLoading] = useState<boolean>(false); // Set to false since we're not checking auth
     const [error, setError] = useState<string | null>(null);
 
     // Configure axios defaults
@@ -44,25 +53,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     }, []);
 
-    // Check if user is logged in on app start
-    useEffect(() => {
-        const checkAuthStatus = async (): Promise<void> => {
-            const token = localStorage.getItem('auth_token');
-            if (token) {
-                try {
-                    const response: AxiosResponse<AuthResponse> = await axios.get('/api/auth/profile');
-                    setUser(response.data.data?.user || null);
-                } catch (error: any) {
-                    console.error('Auth check failed:', error);
-                    localStorage.removeItem('auth_token');
-                    delete axios.defaults.headers.common['Authorization'];
-                }
-            }
-            setLoading(false);
-        };
+    // Authentication disabled - skip auth check
+    // useEffect(() => {
+    //     const checkAuthStatus = async (): Promise<void> => {
+    //         const token = localStorage.getItem('auth_token');
+    //         if (token) {
+    //             try {
+    //                 const response: AxiosResponse<AuthResponse> = await axios.get('/api/auth/profile');
+    //                 setUser(response.data.data?.user || null);
+    //             } catch (error: any) {
+    //                 console.error('Auth check failed:', error);
+    //                 localStorage.removeItem('auth_token');
+    //                 delete axios.defaults.headers.common['Authorization'];
+    //             }
+    //         }
+    //         setLoading(false);
+    //     };
 
-        checkAuthStatus();
-    }, []);
+    //     checkAuthStatus();
+    // }, []);
 
     const login = async (credentials: LoginData): Promise<{ success: boolean; error?: string }> => {
         try {

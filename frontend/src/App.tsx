@@ -54,10 +54,10 @@ const AppContent: React.FC = () => {
         );
     }
 
-    // Show authentication page if user is not logged in
-    if (!user) {
-        return <AuthPage />;
-    }
+    // Authentication disabled - use default user
+    // if (!user) {
+    //     return <AuthPage />;
+    // }
 
     const handleStartInterview = (): void => {
         // Start interview directly without consent check
@@ -127,7 +127,7 @@ const AppContent: React.FC = () => {
                     {/* User Info */}
                     <Box sx={{ mb: 3 }}>
                         <Typography variant="body1" color="text.secondary">
-                            Welcome, {user.email} ({user.role})
+                            Welcome, {user?.email || 'Guest'} ({user?.role || 'candidate'})
                         </Typography>
                     </Box>
 
