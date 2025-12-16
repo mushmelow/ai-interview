@@ -60,11 +60,8 @@ const AppContent: React.FC = () => {
     }
 
     const handleStartInterview = (): void => {
-        if (!consentGiven) {
-            setShowConsent(true);
-        } else {
-            setCurrentView('interview');
-        }
+        // Start interview directly without consent check
+        setCurrentView('interview');
     };
 
     const handleBackToDashboard = (): void => {
